@@ -11,7 +11,7 @@ const PuzzleGames=(()=>{
     document.getElementById('puz-reset').onclick=()=>type==='sudoku'?initSudoku(state.n,state.difficulty):open(type);
   }
   function status(x){let n=document.getElementById('puz-status');if(n)n.textContent=x;}
-  function open(t){type=t;if(t==='sudoku')initSudoku(4);else if(t==='mangala')initMangala();else if(t==='pentago')initPentago();else if(t==='patterns')initPatterns();else if(t==='tangram')initTangram();}
+  function open(t){clearPuzzleTimer();type=t;if(t==='sudoku')initSudoku(4);else if(t==='mangala')initMangala();else if(t==='pentago')initPentago();else if(t==='patterns')initPatterns();else if(t==='tangram')TangramEngine.start();}
   // Sudoku: unique-solution puzzle generation, selectable complexity and elapsed timer.
   let puzzleTimer=null;
   function clearPuzzleTimer(){if(puzzleTimer){clearInterval(puzzleTimer);puzzleTimer=null}}
@@ -79,36 +79,6 @@ const PuzzleGames=(()=>{
   function drawPatterns(){let s=state;layout('Desen Küpleri','Sağdaki karışık kartları çevirerek soldaki deseni aynen oluştur. Her karta dokunduğunda 90° döner.',`<div class="puz-pattern-pair"><div><h3>🎯 Hedef desen</h3><div class="puz-pattern-grid">${s.target.map(tile).join('')}</div></div><div><h3>🧩 Senin desenin</h3><div class="puz-pattern-grid">${s.cells.map((v,i)=>`<button class="puz-pattern-button" data-cell="${i}">${tile(v)}</button>`).join('')}</div></div></div><div class="puz-buttons"><button class="primary" id="puz-pattern-check">Deseni Kontrol Et</button></div>`);
     document.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{s.cells[+b.dataset.cell]=(s.cells[+b.dataset.cell]+1)%4;drawPatterns()});document.getElementById('puz-pattern-check').onclick=()=>status(s.cells.every((v,i)=>v===s.target[i])?'🎉 Deseni eksiksiz oluşturdun!':'🔍 Henüz aynı değil; bazı kareleri çevir.');
     status(`Eşleşen kareler: ${s.cells.filter((v,i)=>v===s.target[i]).length}/9`);
-  }
-  // Seven-piece silhouette: pieces are dragged directly onto a dark target (mouse, pen, touch).
-  // SVG target positions use actual 7-piece geometry, assembled as a figure silhouette.
-  const tangColors=['#f87171','#fbbf24','#60a5fa','#4ade80','#c084fc','#f472b6','#2dd4bf'];
-  const tangFigures=[
-   {name:'Yelkenli',polys:['30,130 145,15 145,130','145,15 260,130 145,130','145,130 225,130 145,210','30,130 85,130 30,185','225,130 280,130 225,185','85,130 145,130 145,190 85,190','30,205 145,205 225,205 165,255']},
-   {name:'Ev',polys:['30,120 145,5 145,120','145,5 260,120 145,120','30,120 110,120 30,200','225,120 280,120 225,175','110,120 165,120 110,175','110,175 170,175 170,235 110,235','170,175 245,175 225,235 150,235']},
-   {name:'Roket',polys:['90,75 205,75 205,190','90,75 90,190 205,190','90,190 170,190 90,270','205,190 260,190 205,245','35,190 90,190 35,245','120,190 180,190 180,250 120,250','180,190 245,190 225,245 160,245']}
-  ];
-  function initTangram(){clearPuzzleTimer();state={figure:rand(tangFigures.length),order:shuffle([0,1,2,3,4,5,6]),placed:Array(7).fill(false),elapsed:0,completed:false};drawTangram();beginPuzzleTimer();}
-  function tangramSet(i,slot){if(state.completed||i!==slot)return;state.placed[i]=true;if(state.placed.every(Boolean)){state.completed=true;clearPuzzleTimer();}drawTangram();}
-  function drawTangram(){let s=state,fig=tangFigures[s.figure];
-    let silhouette=fig.polys.map((pts,i)=>`<polygon class="tang-target ${s.placed[i]?'tang-done':''}" data-slot="${i}" points="${pts}" fill="${s.placed[i]?tangColors[i]:'#334155'}" stroke="#e2e8f0" stroke-width="2"/>`).join('');
-    let tray=s.order.map(i=>`<div class="tang-draggable ${s.placed[i]?'tang-used':''}" draggable="${!s.placed[i]}" data-piece="${i}" tabindex="0" role="button" aria-label="${i+1}. parçayı sürükle"><svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="${fig.polys[i].split(' ').map(str=>str.split(',')).map(([x,y])=>`${(Number(x)-Math.min(...fig.polys[i].split(' ').map(v=>Number(v.split(',')[0]))))*0.65+5},${(Number(y)-Math.min(...fig.polys[i].split(' ').map(v=>Number(v.split(',')[1]))))*0.65+5}`).join(' ')}" fill="${tangColors[i]}" stroke="#fff" stroke-width="2"/></svg><small>${i+1}. parça</small></div>`).join('');
-    layout('Tangram — Silueti Tamamla','Renkli parçaları sürükleyip karartılmış figürün doğru alanına bırak. Dokunmatik cihazlarda da sürükleyebilirsin.',`<div class="puz-meta">⏱️ Süre: <strong id="puz-clock">${timerText(s.elapsed)}</strong> · Figür: <strong>${fig.name}</strong></div><div class="tang-game"><div class="tang-stage"><svg viewBox="0 0 320 285" id="tang-board" aria-label="${fig.name} siluetini tamamla">${silhouette}</svg></div><div class="tang-tray">${tray}</div></div><div class="puz-note">Parçayı alıp karartılmış şeklin üzerine sürükle. Doğru yere gelince otomatik yerleşir. İpuçları için parça numaraları gösterilir.</div><div class="puz-buttons"><button class="secondary" id="tang-new-figure">Başka figür</button></div>`);
-    const board=document.getElementById('tang-board');let active=null,ghost=null;
-    function setHover(slot){board.querySelectorAll('.tang-target').forEach(x=>x.classList.toggle('tang-hover',x.dataset.slot===String(slot)))}
-    function finishDrag(ev){if(active===null)return;let t=document.elementFromPoint(ev.clientX,ev.clientY),polygon=t?.closest?.('[data-slot]');if(polygon&&polygon.closest('#tang-board'))tangramSet(active,+polygon.dataset.slot);active=null;ghost?.remove();ghost=null;setHover(-1);}
-    document.querySelectorAll('.tang-draggable:not(.tang-used)').forEach(src=>{
-      src.addEventListener('dragstart',e=>{active=+src.dataset.piece;e.dataTransfer.setData('text/plain',String(active));e.dataTransfer.effectAllowed='move'});
-      src.addEventListener('dragend',()=>{active=null;setHover(-1)});
-      src.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')return;active=+src.dataset.piece;ghost=src.cloneNode(true);ghost.className='tang-ghost';document.body.appendChild(ghost);src.setPointerCapture(e.pointerId);ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';e.preventDefault()});
-      src.addEventListener('pointermove',e=>{if(active===null||!ghost)return;ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';const target=document.elementFromPoint(e.clientX,e.clientY);setHover(target?.getAttribute('data-slot'))});
-      src.addEventListener('pointerup',finishDrag);
-      src.addEventListener('pointercancel',()=>{active=null;ghost?.remove();ghost=null;setHover(-1)});
-      src.addEventListener('keydown',e=>{if(e.key==='Enter'){let slot=+src.dataset.piece;tangramSet(slot,slot)}});
-    });
-    board.querySelectorAll('[data-slot]').forEach(zone=>{zone.addEventListener('dragover',e=>{e.preventDefault();setHover(zone.dataset.slot)});zone.addEventListener('drop',e=>{e.preventDefault();let i=Number(e.dataTransfer.getData('text/plain'));tangramSet(i,+zone.dataset.slot);active=null;setHover(-1)});});
-    document.getElementById('tang-new-figure').onclick=initTangram;
-    status(s.completed?`🎉 ${fig.name} tamamlandı! Süren: ${timerText(s.elapsed)}`:`Yerleştirilen parça: ${s.placed.filter(Boolean).length}/7`);
   }
   return {has:k=>!!types[k],details:types,open};
 })();
