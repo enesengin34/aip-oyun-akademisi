@@ -64,3 +64,25 @@ main{max-width:1310px;padding:34px 18px 80px;min-height:70vh}.v12-home{display:g
 
 .quiz-lock-box{display:grid;gap:12px}.quiz-form.two-col{grid-template-columns:repeat(2,minmax(0,1fr))}.quiz-help{font-size:.95rem;color:#475569}.quiz-hidden-choices{padding:18px;border:2px dashed #cdd8ea;border-radius:14px;background:#f8fbff;color:#35507f;text-align:center}.quiz-bulk{margin-top:18px;padding-top:18px;border-top:1px dashed #dbe4f0}.quiz-inline-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.quiz-meta-note{margin-top:10px;font-size:.95rem;color:#475569}
 .quiz-login-card{max-width:540px;margin:24px auto}.quiz-login-card form{display:grid;gap:14px}.quiz-login-input{font-size:1.65rem;letter-spacing:.3em;padding:14px;border:2px solid #cbd5e1;border-radius:12px;max-width:100%;width:100%;box-sizing:border-box}.quiz-login-card label{font-weight:700}
+
+/* V12.4.3 — Hakkında sayfası sürüm geçmişi */
+.version-history{scroll-margin-top:96px}
+.version-history-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:20px}
+.version-history-heading h2{margin:8px 0 10px}
+.version-history-heading p{max-width:660px;margin:0;color:#536686}
+.version-current{display:inline-flex;white-space:nowrap;border-radius:999px;padding:9px 14px;background:#e9f0ff;border:1px solid #b9cffa;color:#1b438f;font-weight:900}
+.version-list{display:grid;gap:10px}
+.version-entry{border:1px solid #dbe4f2;border-radius:14px;background:#fff;overflow:hidden}
+.version-entry[open]{border-color:#b8cdf4;box-shadow:0 7px 22px rgba(26,61,120,.07)}
+.version-entry summary{display:flex;align-items:center;gap:12px;padding:15px 17px;cursor:pointer;list-style:none}
+.version-entry summary::-webkit-details-marker{display:none}
+.version-entry summary:hover{background:#f7faff}
+.version-entry summary:focus-visible{outline:3px solid #e5a735;outline-offset:-3px}
+.version-number{flex:0 0 auto;min-width:85px;border-radius:9px;background:#e9f0ff;color:#1f4d9a;padding:7px 9px;text-align:center;font-size:.9rem;font-weight:900;font-variant-numeric:tabular-nums}
+.version-name{flex:1;min-width:0;font-weight:850;color:#142b51}
+.version-tag{flex:0 0 auto;border:1px solid #e0e8f4;background:#f6f8fc;color:#50668b;border-radius:999px;padding:5px 9px;font-size:.74rem;font-weight:700}
+.version-toggle{flex:0 0 auto;font-size:1.4rem;color:#627594;transition:transform .2s}
+.version-entry[open] .version-toggle{transform:rotate(180deg)}
+.version-description{padding:2px 20px 18px 114px;line-height:1.65;color:#425675;font-size:.95rem}
+.version-footnote{font-size:.84rem;color:#66768f;margin:20px 0 0;line-height:1.55}
+@media(max-width:650px){.version-history-heading{flex-direction:column}.version-entry summary{flex-wrap:wrap;gap:8px;padding:12px}.version-name{flex-basis:calc(100% - 105px)}.version-tag{margin-left:0}.version-description{padding:2px 14px 16px}.version-current{font-size:.85rem}}
