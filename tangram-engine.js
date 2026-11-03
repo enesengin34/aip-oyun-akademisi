@@ -47,8 +47,45 @@ const TangramEngine=(()=>{
     document.querySelectorAll('[data-tangpiece]').forEach(b=>{b.onclick=()=>{if(drag)return;game.selected=b.dataset.tangpiece;render()};b.addEventListener('pointerdown',onPointerDown)});
   }
   function onPointerDown(e){if(e.button!==0||!game||game.completed)return;const key=e.currentTarget.dataset.tangpiece;if(game.pieces[key].slot)return;game.selected=key;drag={key,fromX:e.clientX,fromY:e.clientY,ghost:null,src:e.currentTarget,pid:e.pointerId,moved:false};e.currentTarget.setPointerCapture(e.pointerId);e.currentTarget.addEventListener('pointermove',onPointerMove);e.currentTarget.addEventListener('pointerup',onPointerUp,{once:true});e.currentTarget.addEventListener('pointercancel',onPointerCancel,{once:true});}
-  function onPointerMove(e){if(!drag||e.pointerId!==drag.pid)return;let distance=Math.hypot(e.clientX-drag.fromX,e.clientY-drag.fromY);if(distance>7&&!drag.moved){drag.moved=true;const copy=drag.src.querySelector('svg').cloneNode(true);const div=document.createElement('div');div.className='tg-ghost';div.appendChild(copy);document.body.appendChild(div);drag.ghost=div;}
-    if(drag.ghost){e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px'}
+  // Draw the floating piece in the same SVG coordinate scale as the target board.
+  // The source tray uses a fixed-size preview, but the board has a responsive
+  // viewBox. Measuring the board's screen matrix avoids a misleading tiny piece
+  // until the drop is accepted.
+  function updateGhost(e){
+    if(!drag?.ghost)return;
+    const board=$('tg-stage-svg');
+    const rect=board?.getBoundingClientRect();
+    const overBoard=!!rect && e.clientX>=rect.left && e.clientX<=rect.right && e.clientY>=rect.top && e.clientY<=rect.bottom;
+    let size=100;
+    if(overBoard){
+      const matrix=board.getScreenCTM();
+      if(matrix){
+        const svgUnitsToPixels=Math.hypot(matrix.a,matrix.b);
+        size=230*svgUnitsToPixels;
+      }
+    }
+    // The SVG is centered on its polygon centroid (viewBox -115 ... 230).
+    // Aligning the SVG's center with the pointer keeps the piece at the actual
+    // target size while carrying it across the silhouette.
+    drag.ghost.style.width=size+'px';
+    drag.ghost.style.height=size+'px';
+    drag.ghost.style.left=e.clientX+'px';
+    drag.ghost.style.top=e.clientY+'px';
+  }
+  function onPointerMove(e){
+    if(!drag||e.pointerId!==drag.pid)return;
+    const distance=Math.hypot(e.clientX-drag.fromX,e.clientY-drag.fromY);
+    if(distance>7&&!drag.moved){
+      drag.moved=true;
+      const preview=drag.src.querySelector('svg').cloneNode(true);
+      const ghost=document.createElement('div');
+      ghost.className='tg-ghost';
+      ghost.setAttribute('aria-hidden','true');
+      ghost.appendChild(preview);
+      document.body.appendChild(ghost);
+      drag.ghost=ghost;
+    }
+    if(drag.ghost){e.preventDefault();updateGhost(e)}
   }
   function onPointerCancel(){if(!drag)return;drag.src.removeEventListener('pointermove',onPointerMove);drag.ghost?.remove();drag=null}
   function onPointerUp(e){if(!drag)return;const d=drag;d.src.removeEventListener('pointermove',onPointerMove);d.ghost?.remove();drag=null;if(!d.moved){game.selected=d.key;render();return}const board=$('tg-stage-svg');const rect=board.getBoundingClientRect();if(e.clientX<rect.left-12||e.clientX>rect.right+12||e.clientY<rect.top-12||e.clientY>rect.bottom+12){game.status='Parçayı karartılmış hedef alanına bırak.';drawStatus();return}const at=getScreenPoint(e);if(!at)return;place(d.key,at)}
