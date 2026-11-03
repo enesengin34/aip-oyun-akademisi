@@ -198,74 +198,73 @@ const app=document.getElementById('app');const el=(html)=>{app.innerHTML=html};c
 function route(p){page=p;selected=null;const hash=p==='about'?'#hakkinda':'';if(location.hash!==hash)history.replaceState(null,'',location.pathname+location.search+hash);render();window.scrollTo(0,0)}document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>route(b.dataset.page)));window.addEventListener('hashchange',()=>{page=location.hash==='#hakkinda'?'about':'home';selected=null;render();});
 function openFiltered(grade,category){gradeFilter=String(grade);categoryFilter=category;route('games')}
 function categoryCount(id){return catalog.filter(g=>g.enabled&&g.category===id).length}
-function render(){if(page==='home')home();if(page==='games')games();if(page==='brain')Brain.list();if(page==='badges')badges();if(page==='info')info();if(page==='about')about();if(page==='play')play()}
+function render(){document.querySelectorAll('nav [data-page]').forEach(b=>{const active=b.dataset.page===page;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(page==='home')home();if(page==='games')games();if(page==='brain')Brain.list();if(page==='ramadan')Ramadan.landing();if(page==='quiz')Quiz.landing();if(page==='badges')badges();if(page==='info')info();if(page==='about')about();if(page==='play')play()}
 function home(){
-  let total=Object.keys(progress).filter(k=>progress[k]?.wins>0).length;
-  el(`<section class="home-stage">
-    <div class="hero-topline">
-      <div class="brand" style="gap:14px"><img class="school-logo" src="aip-logo-transparent.png" alt="Atışalanı İsmetpaşa İlkokulu logosu"><div><div class="eyebrow" style="font-size:14px;color:#174ea6;letter-spacing:1px">ATIŞALANI İSMETPAŞA İLKOKULU</div><strong style="font-size:28px;color:#12306b">AİP Oyun Akademisi</strong><div style="color:#31558f;font-weight:700;margin-top:6px">55 oyun • Ana sınıfı – 4. sınıf • Eğlenerek öğren</div></div></div>
-      <div class="hero-badges"><div class="circle-icon" title="Ses">🔊</div><div class="circle-icon" title="Ayarlar">⚙️</div></div>
-    </div>
-    <div class="hero-banner">
-      <div class="kid-emoji">🧒</div>
-      <div class="aip-title">
-        <div class="aip-mark"><img src="aip-logo-transparent.png" alt="AİP logosu"><div class="title-text">AİP</div></div>
-        <div class="aip-ribbon">Oyun Akademisi</div>
-        <p class="hero-sub">Oynayarak keşfet, öğrenerek büyü! Renkleri tanı, sesleri dinle, sayılarla düşün, ülkemizi keşfet ve teknolojiyi eğlenceli etkinliklerle öğren.</p>
+  const played=Object.keys(progress).filter(k=>progress[k]?.wins>0).length;
+  const educational=catalog.filter(g=>g.enabled).length;
+  const subjects=[
+    ['logic','➕','Matematik ve Mantık','Sayılarla düşün, problem çöz.','peach'],
+    ['visual','🎨','Renk ve Görsel','Görsel dikkatini geliştir.','lilac'],
+    ['sound','🎵','Ses ve Ritim','Dinle, ayırt et, keşfet.','sky'],
+    ['country','🇹🇷','Ülkemiz','Türkiye’yi daha yakından tanı.','mint'],
+    ['social','🌍','Sosyal Bilgiler','Dünyayı ve tarihimizi keşfet.','lavender'],
+    ['code','🧩','Kodlama','Algoritmalarla düşün.','lemon'],
+    ['ethics','🤝','Dijital Etik','Güvenli ve iyi kararlar ver.','coral']
+  ];
+  el(`<div class="v12-home">
+    <section class="v12-hero" aria-labelledby="hero-title">
+      <div class="v12-hero-copy">
+        <span class="v12-kicker"><span class="v12-kicker-dot"></span> ATIŞALANI İSMETPAŞA İLKOKULU</span>
+        <h1 id="hero-title">Oyunla keşfet.<br><em>Merakla büyü!</em></h1>
+        <p>Her sınıfa özel eğitici oyunlar, akıl-zekâ etkinlikleri ve keşfedilecek yepyeni bilgiler. Öğrenmenin en eğlenceli hâline hoş geldin!</p>
+        <div class="v12-hero-actions">
+          <button class="v12-btn v12-btn-accent" onclick="openFiltered('all','all')">🎮 Oyunları keşfet <span aria-hidden="true">↗</span></button>
+          <button class="v12-btn v12-btn-ghost" onclick="route('brain')">♟️ Akıl-Zekâ Oyunları</button>
+        </div>
+        <div class="v12-hero-numbers"><span><b>${educational+11}</b> toplam oyun</span><i></i><span><b>5</b> sınıf düzeyi</span><i></i><span><b>${played}</b> tamamlanan oyun</span></div>
       </div>
-      <div class="kid-emoji">👧</div>
-    </div>
-    <div class="grade-ribbon">
-      <div class="grade-label">🎓 Sınıfını Seç</div>
-      <button class="grade-pill grade-0" onclick="openFiltered(0,'all')">🧸 Ana Sınıfı</button>
-      <button class="grade-pill grade-1" onclick="openFiltered(1,'all')">1️⃣ 1. Sınıf</button>
-      <button class="grade-pill grade-2" onclick="openFiltered(2,'all')">2️⃣ 2. Sınıf</button>
-      <button class="grade-pill grade-3" onclick="openFiltered(3,'all')">3️⃣ 3. Sınıf</button>
-      <button class="grade-pill grade-4" onclick="openFiltered(4,'all')">4️⃣ 4. Sınıf</button>
-    </div>
-    <div class="subject-grid">
-      <button class="subject-card tile-logic" onclick="openFiltered('all','logic')"><div class="icon">➕➗</div><div class="label">Sayı ve Mantık</div><div class="count">${categoryCount('logic')} oyun</div></button>
-      <button class="subject-card tile-visual" onclick="openFiltered('all','visual')"><div class="icon">🎨</div><div class="label">Renk ve Görsel</div><div class="count">${categoryCount('visual')} oyun</div></button>
-      <button class="subject-card tile-sound" onclick="openFiltered('all','sound')"><div class="icon">🔊</div><div class="label">Ses ve Ritim</div><div class="count">${categoryCount('sound')} oyun</div></button>
-      <button class="subject-card tile-country" onclick="openFiltered('all','country')"><div class="icon">🇹🇷</div><div class="label">Ülkemiz</div><div class="count">${categoryCount('country')} oyun</div></button>
-      <button class="subject-card tile-social" onclick="openFiltered('all','social')"><div class="icon">🌍</div><div class="label">Sosyal Bilgiler</div><div class="count">${categoryCount('social')} oyun</div></button>
-      <button class="subject-card tile-code" onclick="openFiltered('all','code')"><div class="icon">🧩</div><div class="label">Kodlama</div><div class="count">${categoryCount('code')} oyun</div></button>
-      <button class="subject-card tile-ethics" onclick="openFiltered('all','ethics')"><div class="icon">🤝</div><div class="label">Dijital Etik</div><div class="count">${categoryCount('ethics')} oyun</div></button>
-      <button class="subject-card tile-brain" onclick="route('brain')"><div class="icon">🧠</div><div class="label">Akıl-Zekâ</div><div class="count">6 strateji oyunu</div></button>
-    </div>
-    <div class="stats-ribbon">
-      <div class="stat-card"><div class="big">🎮</div><div><strong>55 Oyun</strong><span>Zengin içerik ve sınıf seviyelerine uygun etkinlikler</span></div></div>
-      <div class="stat-card"><div class="big">📚</div><div><strong>20–30 Soru Havuzu</strong><span>Her oyunda farklı etkinlikler ve genişleyen soru bankası</span></div></div>
-      <div class="stat-card"><div class="big">🧠</div><div><strong>Akıllı Hatırlama</strong><span>Daha önce gördüğün soruları aynı cihazda tekrar göstermemeye çalışır</span></div></div>
-      <div class="stat-card"><div class="big">🏅</div><div><strong>İlerleme ve Rozetler</strong><span>${total} tamamlanan oyun • Oynadıkça rozet kazan</span></div></div>
-    </div>
-    <div class="hero-cta-wrap"><button class="primary big-cta" onclick="route('games')">▶ Hemen Oyna</button></div>
-  </section>
-  <section class="home-panels">
-    <div class="home-card">
-      <h2>🎯 Hızlı Başlangıç</h2>
-      <p>Öğrenciler önce sınıf düzeyini seçebilir, sonra oyun kategorilerine göre istedikleri etkinliklere geçebilir. Her oyunda sesli yönergeler, görseller ve rozet sistemi bulunur.</p>
-      <div class="quick-list">
-        <div class="quick-chip">🧸 Ana sınıfı için temel keşif oyunları</div>
-        <div class="quick-chip">✏️ 1 ve 2. sınıfa uygun okuma-yazma ve matematik oyunları</div>
-        <div class="quick-chip">📘 3 ve 4. sınıf için ülkemiz, sosyal bilgiler ve ileri mantık etkinlikleri</div>
-        <div class="quick-chip">🤖 Kodlama, algoritma ve etik temalı oyunlar</div>
+      <div class="v12-hero-graphic" aria-hidden="true">
+        <div class="v12-orbit v12-orbit-one"></div><div class="v12-orbit v12-orbit-two"></div>
+        <div class="v12-float v12-float-star">⭐</div>
+        <div class="v12-float v12-float-book">📚</div>
+        <div class="v12-float v12-float-rocket">🚀</div>
+        <div class="v12-main-illustration"><div class="v12-screen-top"><span></span><span></span><span></span></div><div class="v12-screen-face">🧠<span>+</span>🎮</div><div class="v12-screen-bottom"><span>● ● ●</span><span>✦</span></div></div>
+        <div class="v12-illustration-pill">✨ Haydi, birlikte öğrenelim!</div>
       </div>
-      <div class="cta-row" style="margin-top:18px">${btn('🎮 Oyunları Aç',"route('games')")}${btn('ℹ️ Hakkında',"route('about')",'secondary')}</div>
-    </div>
-    <div class="home-card">
-      <h2>🌟 Akademiden Haberler</h2>
-      <p>Bu sürüm, renkli AİP Oyun Akademisi tasarımıyla hazırlandı. Fotoğraflı Hakkında bölümü, şeffaf okul logosu ve sınıf seviyesine göre oyun seçimi artık ana sayfada daha belirgin.</p>
-      <div class="quick-list">
-        <div class="quick-chip">✅ Hakkında bölümü aktif</div>
-        <div class="quick-chip">✅ 49 eğitsel oyun + 6 akıl-zekâ oyunu</div>
-        <div class="quick-chip">✅ GitHub / Vercel yayınına hazır</div>
-        <div class="quick-chip">✅ Kişisel veri toplamaz</div>
+    </section>
+    <section class="v12-section v12-grade-section" aria-labelledby="grade-title">
+      <div class="v12-section-heading"><div><span class="v12-eyebrow">İLK ADIM</span><h2 id="grade-title">Hangi sınıftasın?</h2><p>Sınıfını seç, tam sana uygun oyunları bul.</p></div><button class="v12-text-link" onclick="openFiltered('all','all')">Tüm oyunlar <span aria-hidden="true">↗</span></button></div>
+      <div class="v12-grades">
+        <button class="v12-grade v12-grade-0" onclick="openFiltered(0,'all')"><span class="v12-grade-icon">🧸</span><span class="v12-grade-name">Ana sınıfı</span><span class="v12-grade-link">Oyunları aç ↗</span></button>
+        ${[1,2,3,4].map(n=>`<button class="v12-grade v12-grade-${n}" onclick="openFiltered(${n},'all')"><span class="v12-grade-icon">${['','✏️','📗','📘','🎓'][n]}</span><span class="v12-grade-name">${n}. sınıf</span><span class="v12-grade-link">Oyunları aç ↗</span></button>`).join('')}
       </div>
-    </div>
-  </section>`)
+    </section>
+    <section class="v12-section" aria-labelledby="subject-title">
+      <div class="v12-section-heading"><div><span class="v12-eyebrow">KEŞİF ALANLARI</span><h2 id="subject-title">Oyun dünyasını keşfet</h2><p>İlgini çeken konuyu seç, yeni bir maceraya başla.</p></div><span class="v12-bubble-label">9 öğrenme alanı</span></div>
+      <div class="v12-subjects">
+        ${subjects.map(([id,ico,name,description,color])=>`<button class="v12-subject v12-tone-${color}" onclick="openFiltered('all','${id}')"><span class="v12-subject-icon">${ico}</span><span class="v12-subject-title">${name}</span><span class="v12-subject-desc">${description}</span><span class="v12-subject-bottom">${categoryCount(id)} oyun <b>↗</b></span></button>`).join('')}
+        <button class="v12-subject v12-subject-ramadan" onclick="route('ramadan')"><span class="v12-subject-icon">🌙</span><span class="v12-subject-title">Ramazan Köşesi</span><span class="v12-subject-desc">Ramazan, değerler ve dinî kültür.</span><span class="v12-subject-bottom">500 soru <b>↗</b></span></button><button class="v12-subject v12-subject-quiz" onclick="route('quiz')"><span class="v12-subject-icon">🏆</span><span class="v12-subject-title">Bilgi Yarışması</span><span class="v12-subject-desc">Öğretmenler için takımlı sınıf yarışması.</span><span class="v12-subject-bottom">Takımlar · Puan · Süre <b>↗</b></span></button><button class="v12-subject v12-subject-brain" onclick="route('brain')"><span class="v12-subject-icon">♟️</span><span class="v12-subject-title">Akıl-Zekâ</span><span class="v12-subject-desc">Satranç, dama ve daha fazlası.</span><span class="v12-subject-bottom">11 strateji ve mantık oyunu <b>↗</b></span></button>
+      </div>
+    </section>
+    <section class="v12-callout"><div class="v12-callout-icon">🏆</div><div><span class="v12-eyebrow">HER ADIM BİR BAŞARI</span><h2>Oyna, öğren, rozet kazan!</h2><p>Oyunları tamamlayarak başarı rozetlerini aç. Gelişimini bu cihazda takip et.</p></div><button class="v12-btn v12-btn-dark" onclick="route('badges')">Rozetlerim ↗</button></section>
+  </div>`);
 }
-function games(){let games=catalog.filter(g=>g.enabled&&(categoryFilter==='all'||g.category===categoryFilter)&&(gradeFilter==='all'||g.grade===Number(gradeFilter)));el(`<h1>🎮 Oyun Kütüphanesi</h1><p>Önce sınıf seviyeni, sonra oyun kategorini seç.</p><div class="tools"><label>Sınıf düzeyi <select onchange="gradeFilter=this.value;render()"><option value="all" ${gradeFilter==='all'?'selected':''}>Tüm seviyeler</option><option value="0" ${gradeFilter==='0'?'selected':''}>Ana sınıfı</option>${[1,2,3,4].map(n=>`<option ${gradeFilter==n?'selected':''} value="${n}">${n}. sınıf</option>`).join('')}</select></label><label>Kategori <select onchange="categoryFilter=this.value;render()"><option value="all">Tüm kategoriler</option>${Object.entries(categories).map(([k,v])=>`<option value="${k}" ${categoryFilter===k?'selected':''}>${v[1]}</option>`).join('')}</select></label></div><div class="cards">${games.map(g=>`<button class="card" onclick="start('${g.id}')"><span class="emoji">${g.emoji}</span><h3>${esc(g.title)}</h3><p>${esc(g.desc)}</p><span class="tag">${g.grade===0?'Ana sınıfı':g.grade+'. sınıf'} ${progress[g.id]?.wins?' • 🏅 Tamamlandı':''}</span></button>`).join('')}</div>${!games.length?'<p>Bu filtrelerde oyun bulunamadı.</p>':''}`)}
+function games(){
+  let filtered=catalog.filter(g=>g.enabled&&(categoryFilter==='all'||g.category===categoryFilter)&&(gradeFilter==='all'||g.grade===Number(gradeFilter)));
+  el(`<section class="v12-library-head"><span class="v12-eyebrow">OYUN KÜTÜPHANESİ</span><h1>Senin oyun alanın 🎮</h1><p>Sınıfını ve istediğin konuyu seç. Kartların üzerine dokunarak oynamaya başlayabilirsin.</p></section>
+    <div class="v12-library-filters"><label>Sınıf düzeyi<select aria-label="Sınıf düzeyi" onchange="gradeFilter=this.value;render()"><option value="all" ${gradeFilter==='all'?'selected':''}>Tüm sınıflar</option><option value="0" ${gradeFilter==='0'?'selected':''}>Ana sınıfı</option>${[1,2,3,4].map(n=>`<option ${gradeFilter==n?'selected':''} value="${n}">${n}. sınıf</option>`).join('')}</select></label>
+    <label>Kategori<select aria-label="Kategori" onchange="categoryFilter=this.value;render()"><option value="all">Tüm kategoriler</option>${Object.entries(categories).map(([k,v])=>`<option value="${k}" ${categoryFilter===k?'selected':''}>${v[1]}</option>`).join('')}</select></label>
+    <label class="v12-search-label">Oyun ara<input type="search" aria-label="Oyun ara" placeholder="Oyun adı veya konu..." oninput="filterLibrary(this.value)"></label></div>
+    <div class="v12-library-result" id="library-result">${filtered.length} oyun bulundu</div>
+    <div class="cards v12-game-cards">${filtered.map(g=>`<button class="card v12-game-card" data-search="${esc((g.title+' '+g.desc).toLocaleLowerCase('tr-TR'))}" onclick="start('${g.id}')"><span class="v12-game-emoji">${g.emoji}</span><span class="v12-game-grade">${g.grade===0?'Ana sınıfı':g.grade+'. sınıf'}</span><h3>${esc(g.title)}</h3><p>${esc(g.desc)}</p><span class="v12-game-play">Oynamaya başla <span aria-hidden="true">↗</span></span>${progress[g.id]?.wins?'<span class="v12-won">🏅 Tamamlandı</span>':''}</button>`).join('')}</div>
+    <p id="library-empty" class="v12-empty" ${filtered.length?'hidden':''}>Bu seçimde oyun bulunamadı. Başka bir sınıf veya kategori seçebilirsin.</p>`)
+}
+function filterLibrary(value){
+ const needle=value.toLocaleLowerCase('tr-TR').trim();let count=0;
+ document.querySelectorAll('.v12-game-card').forEach(card=>{const show=card.dataset.search.includes(needle);card.hidden=!show;if(show)count++});
+ document.getElementById('library-result').textContent=count+' oyun bulundu';
+ document.getElementById('library-empty').hidden=count!==0;
+}
 function start(id){selected=catalog.find(g=>g.id===id);round=0;score=0;blocked=false;position=0;sequence=[];page='play';questionQueues[id]=[];nextQuestion()}
 function originalMakeQ(id){if(id.startsWith('g1-')||id.startsWith('g2-')||id.startsWith('g3-')||id.startsWith('g4-'))return primaryQuestion(id);let shapes=['🔵','🟩','🔺','⭐','❤️','🌙'],animals=[['🐶','hav hav'],['🐱','miyav'],['🐮','möö'],['🐑','mee']],colors=[['Kırmızı','🔴'],['Mavi','🔵'],['Sarı','🟡'],['Yeşil','🟢']],a,b,n;
 const q=(prompt,visual,options,answer,extra={})=>({prompt,visual,options,answer,...extra});
