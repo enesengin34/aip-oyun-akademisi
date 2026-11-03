@@ -8,10 +8,10 @@ let protectedBank=[],authorized=false;
 function stop(){if(tick)clearInterval(tick);tick=null}
 function loginMarkup(message=''){
   stop();
-  $('app').innerHTML=`<section class="quiz-hero"><span class="v12-eyebrow">ÖĞRETMENLERE ÖZEL</span><h1>🔐 Korumalı Bilgi Yarışması</h1><p>Bu bölüm yalnızca yetkili öğretmenler içindir. Devam etmek için yöneticinizin verdiği 8 haneli kodu giriniz.</p></section><section class="quiz-card quiz-login-card"><h2>Öğretmen Girişi</h2><form id="quiz-login-form"><label for="quiz-login-code">8 haneli giriş kodu</label><input id="quiz-login-code" class="quiz-login-input" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" maxlength="8" placeholder="••••••••" required><button class="v12-btn v12-btn-accent" id="quiz-login-button" type="submit">Yarışmaya giriş yap →</button></form><p id="quiz-login-message" class="quiz-meta-note" role="status">${safe(message)}</p></section>`;
+  $('app').innerHTML=`<section class="quiz-hero"><span class="v12-eyebrow">ÖĞRETMENLERE ÖZEL</span><h1>🔐 Korumalı Bilgi Yarışması</h1><p>Bu bölüm yalnızca yetkili öğretmenler içindir. Devam etmek için yöneticinizin verdiği 8 karakterlik (harf ve rakam) kodu giriniz.</p></section><section class="quiz-card quiz-login-card"><h2>Öğretmen Girişi</h2><form id="quiz-login-form"><label for="quiz-login-code">8 karakterlik giriş kodu</label><input id="quiz-login-code" class="quiz-login-input" type="password" inputmode="text" autocomplete="off" pattern="[A-Za-z0-9]{8}" maxlength="8" placeholder="••••••••" required><button class="v12-btn v12-btn-accent" id="quiz-login-button" type="submit">Yarışmaya giriş yap →</button></form><p id="quiz-login-message" class="quiz-meta-note" role="status">${safe(message)}</p></section>`;
   $('quiz-login-form').onsubmit=async event=>{
     event.preventDefault();const code=$('quiz-login-code').value.trim(),messageNode=$('quiz-login-message'),button=$('quiz-login-button');
-    if(!/^\d{8}$/.test(code)){messageNode.textContent='Lütfen 8 rakam girin.';return}
+    if(!/^[A-Za-z0-9]{8}$/.test(code)){messageNode.textContent='Lütfen yalnızca harf ve rakamlardan oluşan 8 karakter girin.';return}
     button.disabled=true;messageNode.textContent='Kod doğrulanıyor…';
     try{
       const r=await fetch('/api/quiz/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({code}),cache:'no-store'});
