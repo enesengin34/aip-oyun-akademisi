@@ -1,2 +1,0 @@
-import {out,error,sameOrigin,data,requireAdmin,getBook,keys,redis,respondError} from './_core.mjs';
-export async function POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{requireAdmin(req);const b=await data(req,1000),book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);if(b.active===true&&book.count<100)return error('Sınavı açmak için en az 100 soru gerekiyor.',409);book.active=b.active===true;await redis('SET',keys.book(book.id),JSON.stringify(book));return out({ok:true,book});}catch(e){return respondError(e)}}
