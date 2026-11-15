@@ -1,0 +1,2 @@
+import {out,student,admin,error,getBooks,respondError} from './_core.mjs';
+export async function GET(req){if(!student(req)&&!admin(req))return error('Giriş gerekiyor.',401);try{let books=await getBooks();return out({books:books.filter(b=>admin(req)||(b.active&&b.count>=100)).map(b=>({id:b.id,title:b.title,author:b.author,grade:b.grade,active:b.active,count:b.count}))})}catch(e){return respondError(e)}}
