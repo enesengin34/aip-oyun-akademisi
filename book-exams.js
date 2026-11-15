@@ -4,7 +4,7 @@ const BookExams=(()=>{
 const $=id=>document.getElementById(id);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let mode='student',exam=null,bookList=[],isAdmin=false;
-async function api(path,body){let r=await fetch('/api/books/'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});let j;try{j=await r.json()}catch{j={}};if(!r.ok){let e=new Error(j.error||`İşlem başarısız (${r.status})`);e.invalidLines=j.invalidLines;throw e}return j}
+async function api(path,body){let r=await fetch('/api/books?action='+encodeURIComponent(path),{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});let j;try{j=await r.json()}catch{j={}};if(!r.ok){let e=new Error(j.error||`İşlem başarısız (${r.status})`);e.invalidLines=j.invalidLines;throw e}return j}
 function top(eyebrow,title,desc){return `<section class="be-hero"><span class="v12-eyebrow">${eyebrow}</span><h1>📚 ${title}</h1><p>${desc}</p></section>`}
 function status(msg=''){let x=$('be-status');if(x)x.textContent=msg}
 function loading(){app.innerHTML=top('KİTAP ARKADAŞIM','Kitap Sınavları','Güvenli giriş denetleniyor…')}
