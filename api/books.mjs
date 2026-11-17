@@ -14,7 +14,7 @@ function sameOrigin(req){const origin=req.headers.get('origin');if(!origin)retur
 async function data(req,limit=250000){const raw=await req.text();if(raw.length>limit)throw new Error('İstek çok büyük.');return JSON.parse(raw)}
 function redisConfig(){let url=process.env.KV_REST_API_URL||process.env.UPSTASH_REDIS_REST_URL,token=process.env.KV_REST_API_TOKEN||process.env.UPSTASH_REDIS_REST_TOKEN;if(!url||!token)throw new Error('Veritabanı bağlantısı kurulmadı.');return {url:url.replace(/\/$/,''),token}}
 async function redis(...command){const {url,token}=redisConfig();let r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(command),cache:'no-store'});if(!r.ok)throw Error('Veritabanı erişim hatası');let j=await r.json();if(j.error)throw Error('Veritabanı komut hatası');return j.result}
-const keys={index:`${ROOT}:index`,book:id=>`${ROOT}:book:${id}`,questions:id=>`${ROOT}:questions:${id}`,resultList:`${ROOT}:results`,studentResult:(sub,id)=>`${ROOT}:result:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,attempt:id=>`${ROOT}:attempt:${id}`,seen:(sub,id)=>`${ROOT}:seen:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,retake:(sub,id)=>`${ROOT}:retake:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,activeAttempt:(sub,id)=>`${ROOT}:active:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,jti:id=>`${ROOT}:assertion:${crypto.createHash('sha256').update(id).digest('hex')}`};
+const keys={index:`${ROOT}:index`,book:id=>`${ROOT}:book:${id}`,questions:id=>`${ROOT}:questions:${id}`,resultList:`${ROOT}:results`,resultDetail:id=>`${ROOT}:result-detail:${id}`,studentLabel:sub=>`${ROOT}:student-label:${crypto.createHash('sha256').update(sub).digest('hex')}`,studentResult:(sub,id)=>`${ROOT}:result:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,attempt:id=>`${ROOT}:attempt:${id}`,seen:(sub,id)=>`${ROOT}:seen:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,retake:(sub,id)=>`${ROOT}:retake:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,activeAttempt:(sub,id)=>`${ROOT}:active:${crypto.createHash('sha256').update(sub+'|'+id).digest('hex')}`,jti:id=>`${ROOT}:assertion:${crypto.createHash('sha256').update(id).digest('hex')}`};
 const str=v=>String(v??'');
 function mac(s,secret,domain){return crypto.createHmac('sha256',secret).update(domain+'|'+s).digest('base64url')}
 const eq=(a,b)=>{let x=Buffer.from(str(a)),y=Buffer.from(str(b));return x.length===y.length&&crypto.timingSafeEqual(x,y)};
@@ -61,21 +61,26 @@ async function authAssertion(assertion){
 async function throttle(key,limit,seconds){const k=`${ROOT}:rate:${crypto.createHash('sha256').update(key).digest('hex')}`;let n=Number(await redis('INCR',k));if(n===1)await redis('EXPIRE',k,seconds);return n<=limit}
 
 
+// The 8-character access code is checked only against the existing Kitap Arkadasim service.
+// It is never stored in Redis, results, logs or the browser after submitting this form.
+async function verifyStudentCode(code){
+ const url=process.env.KITAP_ARKADASIM_API_URL,id=process.env.KITAP_ARKADASIM_INTEGRATION_ID,key=process.env.KITAP_ARKADASIM_INTEGRATION_SECRET;
+ if(!url||!id||!key)throw Object.assign(new Error('Giriş sistemi yapılandırılmadı.'),{status:503});
+ const target=new URL(url);if(target.protocol!=='https:'||target.hostname!=='kitaparkadasim.com')throw Object.assign(new Error('Entegrasyon adresi geçersiz.'),{status:503});
+ const r=await fetch(target,{method:'POST',headers:{'Content-Type':'application/json','X-Integration-Id':id,Authorization:`Bearer ${key}`},body:JSON.stringify({code}),signal:AbortSignal.timeout(10000),cache:'no-store'});
+ if(r.status===429)throw Object.assign(new Error('Giriş deneme sınırı aşıldı.'),{status:429});
+ if(r.status===401||r.status===403)throw Object.assign(new Error('Öğrenci kodu doğrulanamadı.'),{status:401});
+ if(!r.ok)throw Object.assign(new Error('Kitap Arkadaşım doğrulamasına ulaşılamadı.'),{status:503});
+ const response=await r.json();const assertion=response.assertion||response.token||response.verification||response.verificationToken||response.proof||response.data?.assertion||response.data?.token;
+ if(!assertion)throw Object.assign(new Error('Doğrulama yanıtı eksik.'),{status:502});
+ return authAssertion(assertion);
+}
+
 // login
 async function handler_login_POST(req){if(!sameOrigin(req))return error('İstek kaynağı kabul edilmedi.',403);try{
  let b=await data(req,2000),code=String(b.code||'');if(!/^[A-Za-z0-9]{8}$/.test(code))return error('Kod geçersiz.',401);
  const ip=(req.headers.get('x-forwarded-for')||'unknown').split(',')[0];if(!await throttle('student:'+ip,15,900))return error('Çok fazla giriş denemesi.',429);
- const url=process.env.KITAP_ARKADASIM_API_URL,id=process.env.KITAP_ARKADASIM_INTEGRATION_ID,key=process.env.KITAP_ARKADASIM_INTEGRATION_SECRET;
- if(!url||!id||!key)return error('Giriş sistemi yapılandırılmadı.',503);
- const target=new URL(url);if(target.protocol!=='https:'||target.hostname!=='kitaparkadasim.com')return error('Entegrasyon adresi geçersiz.',503);
- const abort=AbortSignal.timeout(10000);
- const r=await fetch(target,{method:'POST',headers:{'Content-Type':'application/json','X-Integration-Id':id,Authorization:`Bearer ${key}`},body:JSON.stringify({code}),signal:abort,cache:'no-store'});
- if(r.status===429)return error('Giriş deneme sınırı aşıldı.',429);
- if(r.status===401||r.status===403)return error('Kod geçersiz.',401);
- if(!r.ok)return error('Kitap Arkadaşım doğrulamasına ulaşılamadı.',503);
- const response=await r.json();const assertion=response.assertion||response.token||response.verification||response.verificationToken||response.proof||response.data?.assertion||response.data?.token;
- if(!assertion)return error('Doğrulama belgesi yanıt içinde bulunamadı. API yanıt şemasını kontrol edin.',502);
- const subject=await authAssertion(assertion);
+ const subject=await verifyStudentCode(code);
  return out({ok:true},200,{'Set-Cookie':sessionCookie('student',subject)});
  }catch(e){return respondError(e)}}
 async function handler_login_GET(){return error('İzin verilmeyen yöntem.',405)}
@@ -140,6 +145,17 @@ async function handler_submit_POST(req){if(!sameOrigin(req))return error('İstek
  const elapsedSeconds=Math.max(0,Math.min(3600,Math.ceil((finished-attempt.created)/1000)));
  const result=grade(attempt,lateBeyondGrace?Array(attempt.questions.length).fill(null):b.answers);
  const record={id:crypto.randomUUID(),bookId:attempt.bookId,studentId:sub,created:new Date(finished).toISOString(),score:result.score,correct:result.correct,total:result.total,elapsedSeconds,timedOut,timerSeconds:limitMs===null?null:Math.floor(limitMs/1000)};
+ // V13.6: Keep answers on the server only, never in the student response.
+ // Question snapshots survive later replacement of the book's question bank.
+ const markedAnswers=lateBeyondGrace?Array(attempt.questions.length).fill(null):b.answers;
+ const details=attempt.questions.map((q,i)=>({
+  questionId:q.id,type:q.type,question:q.question,
+  options:q.type==='test'?q.options:undefined,
+  studentAnswer:q.type==='test'?(Number.isInteger(Number(markedAnswers[i]))&&markedAnswers[i]!==null&&markedAnswers[i]!==''&&Number(markedAnswers[i])>=0&&Number(markedAnswers[i])<4?Number(markedAnswers[i]):null):String(markedAnswers[i]??'').slice(0,200),
+  correctAnswer:q.type==='test'?q.correct:q.answers,
+  correct:result.details[i].correct
+ }));
+ await redis('SET',keys.resultDetail(record.id),JSON.stringify({result:record,questions:details}));
  await redis('LPUSH',keys.resultList,JSON.stringify(record));await redis('SET',keys.studentResult(sub,attempt.bookId),JSON.stringify(record));await redis('DEL',keys.activeAttempt(sub,attempt.bookId));return out({score:result.score,correct:result.correct,total:result.total,elapsedSeconds,timedOut,lateBeyondGrace});
  }catch(e){return respondError(e)}}
 
@@ -254,9 +270,71 @@ async function handler_admin_games_set_POST(req){
  }catch(e){return respondError(e)}
 }
 
-// admin-results
-async function handler_admin_results_GET(req){try{requireAdmin(req);let items=await redis('LRANGE',keys.resultList,0,199);const results=(items||[]).map(x=>JSON.parse(x));return out({results,usage:await recentUsage()})}catch(e){return respondError(e)}}
+// Admin-managed student names/15-digit references, resolved from a verified student code.
+async function handler_admin_student_bind_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,3000),code=str(b.code).trim(),name=str(b.name).trim(),externalId=str(b.externalId).trim();
+ if(!/^[A-Za-z0-9]{8}$/.test(code))return error('8 karakterli öğrenci kodu gerekli.',400);
+ if(name.length>90||/[\x00-\x1F\x7F<>]/.test(name)||externalId&&!/^\d{15}$/.test(externalId))return error('Öğrenci adı veya 15 haneli numara geçersiz.',400);
+ if(!name&&!externalId)return error('Öğrenci adı veya 15 haneli numara girin.',400);
+ const ip=(req.headers.get('x-forwarded-for')||'unknown').split(',')[0];
+ if(!await throttle('admin-student-bind:'+ip,25,900))return error('Çok fazla eşleştirme denemesi. Daha sonra yeniden deneyin.',429);
+ const sub=await verifyStudentCode(code);const label={name,externalId,updated:new Date().toISOString()};
+ await redis('SET',keys.studentLabel(sub),JSON.stringify(label));
+ return out({ok:true,studentRef:sub.slice(0,12),label});
+ }catch(e){return respondError(e)}}
+async function handler_admin_student_clear_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,1000),sub=str(b.studentId);
+ if(sub.length<8||sub.length>200)return error('Öğrenci kimliği geçersiz.',400);
+ await redis('DEL',keys.studentLabel(sub));return out({ok:true});
+ }catch(e){return respondError(e)}}
+async function studentLabels(subs){const unique=[...new Set(subs)].filter(s=>typeof s==='string'&&s.length>=8&&s.length<=200);if(!unique.length)return {};
+ const raw=await redis('MGET',...unique.map(keys.studentLabel));const labels={};
+ unique.forEach((sub,i)=>{if(raw[i]){try{const val=JSON.parse(raw[i]);labels[sub]={name:str(val.name),externalId:str(val.externalId)}}catch{}}});return labels;
+}
 
+// admin-results
+async function handler_admin_results_GET(req){try{requireAdmin(req);let items=await redis('LRANGE',keys.resultList,0,199);const results=(items||[]).map(x=>JSON.parse(x));return out({results,studentLabels:await studentLabels(results.map(r=>r.studentId)),usage:await recentUsage()})}catch(e){return respondError(e)}}
+
+
+// V13.6: Admin-only question details and analysis. Older results have no recoverable answers.
+async function handler_admin_detail_GET(req){try{
+ requireAdmin(req);const id=new URL(req.url).searchParams.get('id')||'';
+ if(!/^[a-f0-9-]{36}$/.test(id))return error('Sonuç kimliği geçersiz.',400);
+ const raw=await redis('GET',keys.resultDetail(id));
+ if(!raw)return error('Bu sınavın soru bazlı kaydı bulunmuyor. V13.6 öncesi sonuç olabilir.',404);
+ return out(JSON.parse(raw));
+}catch(e){return respondError(e)}}
+
+async function handler_admin_analysis_GET(req){try{
+ requireAdmin(req);
+ const id=new URL(req.url).searchParams.get('bookId')||'';
+ if(id&&!safeId(id))return error('Kitap seçimi geçersiz.',400);
+ const raw=await redis('LRANGE',keys.resultList,0,199);
+ const all=(raw||[]).map(x=>JSON.parse(x));
+ const selected=id?all.filter(r=>r.bookId===id):all;
+ // Results remain paginated to the most recent 200; never mislabel this as all-time data.
+ const detailed=selected.filter(r=>/^[a-f0-9-]{36}$/.test(r.id));
+ const rawDetails=detailed.length?await redis('MGET',...detailed.map(r=>keys.resultDetail(r.id))):[];
+ const questions=new Map(),typeStats={test:{answered:0,correct:0},bosluk:{answered:0,correct:0}};
+ let analyzedAttempts=0;
+ for(const text of rawDetails||[]){if(!text)continue;let data;try{data=JSON.parse(text)}catch{continue}
+  if(!Array.isArray(data.questions))continue;analyzedAttempts++;
+  for(const q of data.questions){if(!['test','bosluk'].includes(q.type)||typeof q.question!=='string')continue;
+   const key=data.result.bookId+'|'+q.questionId;
+   const row=questions.get(key)||{bookId:data.result.bookId,questionId:q.questionId,question:q.question,type:q.type,asked:0,correct:0};
+   row.asked++;if(q.correct)row.correct++;questions.set(key,row);
+   typeStats[q.type].answered++;if(q.correct)typeStats[q.type].correct++;
+  }
+ }
+ const count=selected.length;
+ return out({scope:'last_200_results',totalResults:count,analyzedAttempts,oldResultsWithoutDetail:count-analyzedAttempts,
+  averageScore:count?Math.round(selected.reduce((n,r)=>n+(Number(r.score)||0),0)/count*10)/10:null,
+  averageSeconds:(()=>{const values=selected.map(r=>r.elapsedSeconds).filter(Number.isFinite);return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null})(),
+  timedOut:selected.filter(r=>r.timedOut===true).length,
+  typeStats,questions:[...questions.values()].map(q=>({...q,rate:Math.round(100*q.correct/q.asked)})).sort((a,b)=>a.correct/a.asked-b.correct/b.asked||b.asked-a.asked).slice(0,250),
+  books:[...new Set(all.map(r=>r.bookId))]
+ });
+}catch(e){return respondError(e)}}
 
 // admin-backup
 async function handler_admin_backup_GET(req){try{requireAdmin(req);let books=await getBooks();let payload=await Promise.all(books.map(async b=>({book:b,questions:await getQuestions(b.id)})));return out({created:new Date().toISOString(),version:1,data:payload})}catch(e){return respondError(e)}}
@@ -275,6 +353,10 @@ const handlers = {
   'admin-toggle': {'POST': handler_admin_toggle_POST},
   'admin-timer': {'POST': handler_admin_timer_POST},
   'admin-results': {'GET': handler_admin_results_GET},
+  'admin-student-bind': {'POST': handler_admin_student_bind_POST},
+  'admin-student-clear': {'POST': handler_admin_student_clear_POST},
+  'admin-detail': {'GET': handler_admin_detail_GET},
+  'admin-analysis': {'GET': handler_admin_analysis_GET},
   'admin-backup': {'GET': handler_admin_backup_GET},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},

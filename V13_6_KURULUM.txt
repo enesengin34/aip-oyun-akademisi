@@ -1,0 +1,45 @@
+AİP OYUN AKADEMİSİ — V13.6 SINAV ANALİZLERİ + ÖĞRENCİ KİMLİK EŞLEŞTİRME
+=====================================================================
+
+BU GÜNCELLEMEYİ V13.5 (VEYA DAHA YENİ V13.5 İÇEREN) CANLI SÜRÜMÜN ÜZERİNE YÜKLEYİN.
+
+Yüklenen 2 dosya:
+- book-exams.js  -> GitHub deponuzun ana dizini
+- api/books.mjs  -> GitHub deponuzun api klasörü
+
+GitHub'a yükleyin, ana dalda commit yapın; Vercel'in yeni dağıtımı Ready olunca yönetici panelini açın.
+Ayrı api/books/ klasörü oluşturmayın. api/quiz dosyalarına dokunmayın.
+Yeni Vercel Environment Variable veya yeni veritabanı gerekmiyor.
+
+YENİ BÖLÜMLER
+1) Ayrıntılı Sınav Analizleri: Son 200 sınavın ortalama puanı, süresi, soru başarı oranları,
+   test ve boşluk doldurma başarıları; yöneticiye özel "Cevapları gör" bağlantısı.
+2) Öğrenci Kimliklerini Eşleştir: Kitap Arkadaşım'daki 8 karakterli mevcut öğrenci
+   kodunu girin. Bildiğiniz öğrenci adı ve/veya 15 haneli numarayı YÖNETİCİ OLARAK girin.
+   "Öğrenciyi eşleştir" düğmesine basın. Kod uzaktaki Kitap Arkadaşım servisinde
+   doğrulanarak mevcut anonim öğrenci kimliğiyle eşleştirilir; kod saklanmaz.
+   Aynı kişiye ait geçmiş ve yeni sınav sonuçlarında ad/numara görünür.
+   Yanlış eşleştirmeyi "Eşleştirmeyi kaldır" düğmesinden kaldırabilirsiniz.
+
+GÜVENLİK
+- Öğrenci adı ve 15 haneli referans yalnızca yönetici oturumu ile okunabilir.
+- Öğrenci kodları veritabanına kaydedilmez, yalnızca doğrulama sırasında gönderilir.
+- Yönetici bağlantısının gizlenmesi korunmuştur; parola kontrolü yine sunucudadır.
+- Doğru cevap ayrıntıları öğrenci ekranına gönderilmez.
+- 15 haneli numara entegrasyondan otomatik gelmez; girilen numara yöneticinin beyanıdır.
+- Kimlik eşleştirmesi oluşturmak için ilgili öğrencinin GEÇERLİ giriş kodunu bilmek gerekir.
+
+ÖNEMLİ: Eski sonuçların soru bazındaki cevapları daha önce kaydedilmediğinden geri getirilemez.
+Ancak eski sonuçların öğrenci kimliği eşleştirmesi yapılabilir. Beceri analizi etiketsiz tahmin edilmez.
+
+KONTROL
+1. Vercel Ready olsun.
+2. Yönetici paneli -> Öğrenci Kimliklerini Eşleştir: Bilinen bir öğrenci kodu,
+   ad ve varsa 15 haneli numara girin, eşleştirin.
+3. Son 200 sınav sonucunda aynı öğrenci adının ve numarasının göründüğünü doğrulayın.
+4. Aynı sonuç için "Cevapları gör" tıklayın. Güncelleme sonrası yeni sonuçlarda
+   soru bazlı doğru/yanlış görünmeli. Eski sonuçlarda ayrıntı olmadığı açıklanır.
+5. Yanlış kodun eşleştirmeyi reddettiğini doğrulayın.
+
+NOT: Bu paket mevcut V13.6 analiz geliştirmesi ile öğrenciyi tanıma düzeltmesini BİRLİKTE içerir.
+Önceki ayrı V13.6 paketini ayrıca yüklemenize gerek yoktur.
