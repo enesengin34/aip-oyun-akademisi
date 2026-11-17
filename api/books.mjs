@@ -29,6 +29,8 @@ async function requireStudent(req){let s=student(req);if(!s)throw Object.assign(
 function requireAdmin(req){if(!admin(req))throw Object.assign(new Error('Yönetici girişi gerekiyor.'),{status:401})}
 function respondError(e){return error(e.status?e.message:'Sunucu işlemi tamamlanamadı.',e.status||503)}
 function safeId(v){return /^[a-z0-9-]{5,55}$/.test(str(v))}
+function examTimer(book){const v=Number(book?.timerSeconds);return book?.timed===true&&Number.isInteger(v)&&v>=10&&v<=3599?v:null}
+function publicBook(b){return {id:b.id,title:b.title,author:b.author,grade:b.grade,active:b.active,count:b.count,timed:examTimer(b)!==null,timerSeconds:examTimer(b)||0}}
 async function getBook(id){if(!safeId(id))return null;let s=await redis('GET',keys.book(id));return s?JSON.parse(s):null}
 async function getBooks(){let ids=JSON.parse((await redis('GET',keys.index))||'[]');let b=await Promise.all(ids.map(getBook));return b.filter(Boolean)}
 async function getQuestions(id){return JSON.parse((await redis('GET',keys.questions(id)))||'[]')}
@@ -42,7 +44,7 @@ function parseBulk(text){let parsed=[],errors=[];str(text).split(/\r?\n/).forEac
   if(type==='BOSLUK'&&p.length===3){q={type:'bosluk',question:p[1],answers:p[2].split('/').map(x=>x.trim()).filter(Boolean)}}
   if(!validateQuestion(q))errors.push(i+1);else parsed.push({...q,id:crypto.randomUUID()})});return {parsed,errors}}
 function normalize(s){return str(s).normalize('NFC').toLocaleLowerCase('tr-TR').trim().replace(/\s+/g,' ').replace(/[.!?,;:]+$/g,'')}
-function grade(attempt,answers){let n=0;const details=attempt.questions.map((q,i)=>{const a=answers[i];let good=q.type==='test'?Number(a)===q.correct:q.answers.some(v=>normalize(v)===normalize(a));if(good)n++;return {type:q.type,correct:good}});return {correct:n,total:attempt.questions.length,score:Math.round(n/attempt.questions.length*100),details}}
+function grade(attempt,answers){let n=0;const details=attempt.questions.map((q,i)=>{const a=answers[i];let good=q.type==='test'?(a!==null&&a!==undefined&&Number(a)===q.correct):q.answers.some(v=>normalize(v)===normalize(a));if(good)n++;return {type:q.type,correct:good}});return {correct:n,total:attempt.questions.length,score:Math.round(n/attempt.questions.length*100),details}}
 async function authAssertion(assertion){
  const secret=integrationSecret();if(!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(str(assertion)))throw Object.assign(new Error('Geçersiz doğrulama yanıtı.'),{status:401});
  const [v,p,sig]=assertion.split('.');
@@ -88,7 +90,7 @@ async function handler_session_GET(req){const sub=student(req);return out({stude
 
 
 // list
-async function handler_list_GET(req){if(!student(req)&&!admin(req))return error('Giriş gerekiyor.',401);try{let books=await getBooks();return out({books:books.filter(b=>admin(req)||(b.active&&b.count>=100)).map(b=>({id:b.id,title:b.title,author:b.author,grade:b.grade,active:b.active,count:b.count}))})}catch(e){return respondError(e)}}
+async function handler_list_GET(req){if(!student(req)&&!admin(req))return error('Giriş gerekiyor.',401);try{let books=await getBooks();return out({books:books.filter(b=>admin(req)||(b.active&&b.count>=100)).map(publicBook)})}catch(e){return respondError(e)}}
 
 
 // start: one completed exam per book by default; further attempts require a fresh manager grant.
@@ -98,7 +100,7 @@ async function handler_start_POST(req){if(!sameOrigin(req))return error('İstek 
  const completedKey=keys.studentResult(sub,book.id),retakeKey=keys.retake(sub,book.id),lockKey=keys.activeAttempt(sub,book.id);
  let bank=await getQuestions(book.id);if(bank.length<100)return error('Soru havuzu eksik.',409);
  const existing=await redis('GET',lockKey);
- if(existing){const raw=await redis('GET',keys.attempt(existing));if(raw){let old=JSON.parse(raw);if(old.sub===sub&&old.bookId===book.id)return out({attemptId:existing,book:{title:book.title,id:book.id},questions:publicQuestions(old.questions)});}await redis('DEL',lockKey)}
+ if(existing){const raw=await redis('GET',keys.attempt(existing));if(raw){let old=JSON.parse(raw);if(old.sub===sub&&old.bookId===book.id)return out({attemptId:existing,book:publicBook(book),questions:publicQuestions(old.questions),startedAt:old.created,deadlineAt:old.deadlineAt||null});}await redis('DEL',lockKey)}
  const id=crypto.randomUUID();
  // Atomic reservation blocks concurrent attempts from the same student for the same book.
  if(await redis('SET',lockKey,id,'EX',3600,'NX')!=='OK')return error('Açık bir sınavınız var. Biraz sonra tekrar deneyin.',409);
@@ -112,9 +114,10 @@ async function handler_start_POST(req){if(!sameOrigin(req))return error('İstek 
   let unseen=shuffle(bank.filter(q=>!seen.has(q.id))),repeat=shuffle(bank.filter(q=>seen.has(q.id)));
   if(unseen.length===0){await redis('DEL',seenKey);unseen=shuffle([...bank]);repeat=[]}
   const questions=shuffle([...unseen.slice(0,10),...repeat.slice(0,Math.max(0,10-unseen.length))]);
-  await redis('SET',keys.attempt(id),JSON.stringify({bookId:book.id,sub,created:Date.now(),questions}),'EX',3600);
+  const created=Date.now(),seconds=examTimer(book),deadlineAt=seconds?created+seconds*1000:null;
+  await redis('SET',keys.attempt(id),JSON.stringify({bookId:book.id,sub,created,deadlineAt,questions}),'EX',3600);
   for(const q of questions)await redis('SADD',seenKey,q.id);
-  return out({attemptId:id,book:{title:book.title,id:book.id},questions:publicQuestions(questions)});
+  return out({attemptId:id,book:publicBook(book),questions:publicQuestions(questions),startedAt:created,deadlineAt});
  }catch(e){await redis('DEL',lockKey);throw e}
 } catch(e){return respondError(e)}}
 function publicQuestions(questions){return questions.map(q=>({id:q.id,type:q.type,question:q.question,...q.type==='test'?{options:q.options}:{}}))}
@@ -129,9 +132,15 @@ async function handler_submit_POST(req){if(!sameOrigin(req))return error('İstek
  let raw=await redis('GETDEL',keys.attempt(b.attemptId));if(!raw)return error('Sınav süresi dolmuş veya sınav gönderilmiş.',410);
  let attempt=JSON.parse(raw);if(attempt.sub!==sub)return error('Yetkisiz sınav.',403);
  if(attempt.created>Date.now()||Date.now()-attempt.created>3600000)return error('Sınav süresi dolmuş.',410);
- let result=grade(attempt,b.answers);
- const record={id:crypto.randomUUID(),bookId:attempt.bookId,studentId:sub,created:new Date().toISOString(),score:result.score,correct:result.correct,total:result.total};
- await redis('LPUSH',keys.resultList,JSON.stringify(record));await redis('SET',keys.studentResult(sub,attempt.bookId),JSON.stringify(record));await redis('DEL',keys.activeAttempt(sub,attempt.bookId));return out({score:result.score,correct:result.correct,total:result.total});
+ const finished=Date.now(),limitMs=attempt.deadlineAt?Math.max(0,attempt.deadlineAt-attempt.created):null;
+ const timedOut=limitMs!==null&&finished>=attempt.deadlineAt;
+ // Client countdown is informational; only server timestamps decide whether answers may be scored.
+ // Small network grace prevents a zero score from a submission dispatched at the deadline.
+ const lateBeyondGrace=limitMs!==null&&finished>attempt.deadlineAt+10000;
+ const elapsedSeconds=Math.max(0,Math.min(3600,Math.ceil((finished-attempt.created)/1000)));
+ const result=grade(attempt,lateBeyondGrace?Array(attempt.questions.length).fill(null):b.answers);
+ const record={id:crypto.randomUUID(),bookId:attempt.bookId,studentId:sub,created:new Date(finished).toISOString(),score:result.score,correct:result.correct,total:result.total,elapsedSeconds,timedOut,timerSeconds:limitMs===null?null:Math.floor(limitMs/1000)};
+ await redis('LPUSH',keys.resultList,JSON.stringify(record));await redis('SET',keys.studentResult(sub,attempt.bookId),JSON.stringify(record));await redis('DEL',keys.activeAttempt(sub,attempt.bookId));return out({score:result.score,correct:result.correct,total:result.total,elapsedSeconds,timedOut,lateBeyondGrace});
  }catch(e){return respondError(e)}}
 
 
@@ -170,6 +179,15 @@ async function handler_admin_import_POST(req){if(!sameOrigin(req))return error('
 // admin-toggle
 async function handler_admin_toggle_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{requireAdmin(req);const b=await data(req,1000),book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);if(b.active===true&&book.count<100)return error('Sınavı açmak için en az 100 soru gerekiyor.',409);book.active=b.active===true;await redis('SET',keys.book(book.id),JSON.stringify(book));return out({ok:true,book});}catch(e){return respondError(e)}}
 
+
+// Per-book timer settings. Changes affect future attempts; existing attempts retain their original deadline.
+async function handler_admin_timer_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,1200),book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);
+ if(typeof b.timed!=='boolean')return error('Süre ayarı geçersiz.',400);
+ let seconds=0;
+ if(b.timed){if(!Number.isInteger(b.minutes)||!Number.isInteger(b.seconds)||b.minutes<0||b.minutes>59||b.seconds<0||b.seconds>59)return error('Dakika ve saniye değerleri geçersiz.',400);seconds=b.minutes*60+b.seconds;if(seconds<10||seconds>3599)return error('Süre 10 saniye ile 59 dakika 59 saniye arasında olmalıdır.',400)}
+ book.timed=b.timed;book.timerSeconds=seconds;await redis('SET',keys.book(book.id),JSON.stringify(book));return out({ok:true,book:publicBook(book)});
+}catch(e){return respondError(e)}}
 
 // Anonymous aggregated usage. No student code, cookie ID, IP or user agent is stored.
 // Every event is constrained to a short safe label and an active time <= 60 seconds.
@@ -255,6 +273,7 @@ const handlers = {
   'admin-create': {'POST': handler_admin_create_POST},
   'admin-import': {'POST': handler_admin_import_POST},
   'admin-toggle': {'POST': handler_admin_toggle_POST},
+  'admin-timer': {'POST': handler_admin_timer_POST},
   'admin-results': {'GET': handler_admin_results_GET},
   'admin-backup': {'GET': handler_admin_backup_GET},
   'admin-retake': {'POST': handler_admin_retake_POST},

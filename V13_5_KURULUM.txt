@@ -1,0 +1,41 @@
+AİP OYUN AKADEMİSİ V13.5 — KİTAP SINAVI SÜRE AYARI VE SÜRE KAYDI
+=================================================================
+Mevcut V13.4 üzerine iki dosyalık güncelleme.
+
+DOSYALARIN KONUMU
+- book-exams.js       -> GitHub depo ANA DİZİNİ (mevcut dosyanın yerine)
+- api/books.mjs       -> GitHub depo api/ KLASÖRÜ (mevcut dosyanın yerine)
+
+GitHub'a ZIP'i değil, ZIP'ten çıkardığınız dosyaları klasörleri korunacak şekilde yükleyin.
+Commit directly to main ve Vercel Ready sonrasında kontrol edin.
+
+YÖNETİM
+Kitaplar bölümünde her kitap için "Süreli sınav" kutusu vardır.
+İşaretliyse dakika/saniye seçip "Süreyi kaydet" düğmesine basın.
+Süre aralığı: 00:10 ila 59:59. İşareti kaldırırsanız kitap süresiz olur.
+Ayarlamalar yalnızca yeni başlayan sınavları etkiler; başlamış sınavın süresi değişmez.
+
+ÖĞRENCİ
+Süreli sınavlarda geri sayım görünür, süre dolunca otomatik gönderim yapılır.
+Süresiz sınavlarda geri sayım yoktur ama geçen süre kaydedilir.
+Süre sunucu başlangıç zamanına göredir; sayfa yenilemek süreyi sıfırlamaz.
+
+SONUÇLAR
+Son 200 sınav sonucu tablosunda "Tamamlama süresi" ve "Durum" bulunur.
+CSV çıktısına "Tamamlama süresi (saniye)" ve "Süre doldu mu" sütunları eklenir.
+Eski sınav kayıtlarının süreleri geriye dönük hesaplanamaz, "—" olarak gösterilir.
+
+ÖNEMLİ SINIRLAR
+- Sınav açıkken tarayıcıyı kapatan öğrencinin sınavı otomatik bitmiş sayılması
+  garantili değildir: otomatik gönderim için açık bir sayfa ve bağlantı gerekir.
+  Yeniden açıldığında aynı sınavın mevcut süresi devam eder / sona ermişse
+  otomatik gönderim denenir.
+- Sunucu tarafı 10 sn ağ gecikmesi toleransı uygulanır. Çok geç gönderilen
+  sınavda doğru cevaplar puanlanmaz. Süre bittiği için boş kalan cevaplar
+  puan getirmez.
+- Süre ölçümü sınavın sunucuda başlatılması ile cevapların sunucuya ulaşması
+  arasındadır; öğrencinin aktif ekrana bakma süresi değildir.
+- Öğrencinin yanındaki kitabı açıp aramasını teknik olarak tamamen engellemez.
+  Çok kısa süreler ölçülen beceriyi olumsuz etkileyebilir.
+- Mevcut veri, kitaplar ve sınav sonuçları silinmez.
+- Yeni sunucu fonksiyonu / yeni ortam değişkeni gerekmez.
