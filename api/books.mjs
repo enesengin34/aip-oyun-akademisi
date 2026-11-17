@@ -277,7 +277,7 @@ async function handler_admin_student_bind_POST(req){if(!sameOrigin(req))return e
  if(name.length>90||/[\x00-\x1F\x7F<>]/.test(name)||externalId&&!/^\d{15}$/.test(externalId))return error('Öğrenci adı veya 15 haneli numara geçersiz.',400);
  if(!name&&!externalId)return error('Öğrenci adı veya 15 haneli numara girin.',400);
  const ip=(req.headers.get('x-forwarded-for')||'unknown').split(',')[0];
- if(!await throttle('admin-student-bind:'+ip,25,900))return error('Çok fazla eşleştirme denemesi. Daha sonra yeniden deneyin.',429);
+ if(!await throttle('admin-student-bind:v2:'+ip,200,900))return error('Çok fazla eşleştirme denemesi. Daha sonra yeniden deneyin.',429);
  const sub=await verifyStudentCode(code);const label={name,externalId,updated:new Date().toISOString()};
  await redis('SET',keys.studentLabel(sub),JSON.stringify(label));
  return out({ok:true,studentRef:sub.slice(0,12),label});
@@ -291,6 +291,33 @@ async function studentLabels(subs){const unique=[...new Set(subs)].filter(s=>typ
  const raw=await redis('MGET',...unique.map(keys.studentLabel));const labels={};
  unique.forEach((sub,i)=>{if(raw[i]){try{const val=JSON.parse(raw[i]);labels[sub]={name:str(val.name),externalId:str(val.externalId)}}catch{}}});return labels;
 }
+
+// Admin-only roster of all stored mappings, including students without exam results.
+// The mapping keys are hashed; we intentionally never store or expose access codes.
+async function handler_admin_student_roster_GET(req){try{
+ requireAdmin(req);
+ const pattern=`${ROOT}:student-label:*`;
+ let cursor='0',scanned=0,stored=[],complete=false;
+ do{
+  const page=await redis('SCAN',cursor,'MATCH',pattern,'COUNT',200);
+  if(!Array.isArray(page)||page.length<2||!Array.isArray(page[1]))throw new Error('Liste okunamadı.');
+  cursor=String(page[0]);
+  stored.push(...page[1]);
+  scanned++;
+  if(cursor==='0'){complete=true;break}
+ }while(scanned<30&&stored.length<2500);
+ const unique=[...new Set(stored)].slice(0,2500),students=[];
+ // Redis MGET in moderate chunks to avoid oversized requests.
+ for(let i=0;i<unique.length;i+=100){
+  const raw=await redis('MGET',...unique.slice(i,i+100));
+  raw.forEach(value=>{if(!value)return;try{
+   const d=JSON.parse(value);
+   if(typeof d.name==='string'||typeof d.externalId==='string')students.push({name:str(d.name).slice(0,90),externalId:str(d.externalId).slice(0,15),updated:str(d.updated).slice(0,30)});
+  }catch{}});
+ }
+ students.sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+ return out({students,total:students.length,complete});
+}catch(e){return respondError(e)}}
 
 // admin-results
 async function handler_admin_results_GET(req){try{requireAdmin(req);let items=await redis('LRANGE',keys.resultList,0,199);const results=(items||[]).map(x=>JSON.parse(x));return out({results,studentLabels:await studentLabels(results.map(r=>r.studentId)),usage:await recentUsage()})}catch(e){return respondError(e)}}
@@ -354,6 +381,7 @@ const handlers = {
   'admin-timer': {'POST': handler_admin_timer_POST},
   'admin-results': {'GET': handler_admin_results_GET},
   'admin-student-bind': {'POST': handler_admin_student_bind_POST},
+  'admin-student-roster': {'GET': handler_admin_student_roster_GET},
   'admin-student-clear': {'POST': handler_admin_student_clear_POST},
   'admin-detail': {'GET': handler_admin_detail_GET},
   'admin-analysis': {'GET': handler_admin_analysis_GET},

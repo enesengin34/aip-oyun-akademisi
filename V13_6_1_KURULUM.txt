@@ -1,0 +1,21 @@
+AIP OYUN AKADEMISI V13.6.1 - ESLESTIRME SINIRI VE OGRENCI LISTESI
+
+Degisen dosyalar:
+- book-exams.js -> GitHub projesinin ana dizinine
+- api/books.mjs -> GitHub projesinin api/ klasorune
+
+Eslestirme islem siniri: 25 / 15 dk yerine 200 / 15 dk.
+Yeni 'Esleştirilen Öğrenciler' listesi, Redis'te tutulan onceki eslestirmeleri de gosterir.
+Listeyi yenile dugmesiyle tekrar yukleyebilirsiniz.
+Liste yalnizca yonetici oturumuyla alinabilir, 8 karakterli kodlar saklanmaz/gosterilmez.
+
+Dikkat: Kitap Arkadasim uygulamasinin kendi kod dogrulama limitleri ayri olabilir.
+Eski 25'lik sayac yeni 'v2' sayaci ile degistiginden eski sayaç guncellemeyi etkilemez.
+
+Yukleme:
+1. ZIP'i ayiklayin. ZIP'in kendisini GitHub'a yuklemeyin.
+2. Dosyalari yukaridaki dizinlerine yerlestirin.
+3. Commit directly to main branch. Vercel Ready oldugunda paneli yenileyin.
+4. Kitap sinavlari yonetim panelinde 'Esleştirilen Öğrenciler' bolumunu acin.
+
+NOT: Bu paket V13.6 'Analiz ve Ogrenci Eslestirme' guncellemesi UZERINE uygulanir.
