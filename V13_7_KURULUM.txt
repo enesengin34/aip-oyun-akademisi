@@ -1,0 +1,42 @@
+AİP OYUN AKADEMİSİ — V13.7 BECERİ TEMELLİ ÖLÇME DEĞERLENDİRME
+
+GÜNCELLEME (mevcut V13.6.1 üzerine):
+1. book-exams.js  -> GitHub depo ana dizini
+2. api/books.mjs -> GitHub api klasörü
+
+GitHub > main dalında eski dosyaların üzerine yükleyin.
+Commit: V13.7 - Beceri temelli olcme degerlendirme
+Vercel Ready olduktan sonra yönetici panelindeki "Ayrıntılı Sınav Analizleri" bölümünü açın.
+
+YENİ ÖZELLİKLER
+- Beş beceri: Olayları anlama, Karakterleri yorumlama, Neden-sonuç,
+  Çıkarım, Ana fikir ve kişisel yorum.
+- Her kitabın sorularını tek tek veya sayfada topluca etiketleme (25 soru/sayfa).
+- Değişiklikleri kaydet düğmesiyle mevcut Redis soru bankasına kaydetme.
+- Beceri bazında doğru/toplam/başarı oranı; öğrenci bazında rapor;
+  kitap/genel ortalamaları; öğrencinin deneme gelişimi; soruların başarıları.
+- Beceri etiketleri kaydedilince, mevcut V13.6 ve sonraki soru ayrıntıları
+  soru kimliği eşleşmesi koşuluyla geçmişe dönük beceri hesaplamasına katılır.
+- Yeni sınavda, her beş beceriden en az 2 adet daha önce görülmemiş etiketli
+  soru varsa 10 sorunun 2'şer tanesi her beceriden seçilir.
+- Yeterli etiketli soru yoksa önce görülmeyen sorulara öncelik veren mevcut
+  rastgele seçim devam eder.
+
+ÖNEMLİ:
+- Etiketler otomatik tahmin edilmez. Sorunun gerçekten ölçtüğü birincil beceriyi
+  yönetici seçmelidir. Toplu etiketleme yalnızca görünen 25 etiketlenmemiş
+  soruya uygulanır; soru bazında doğrulayın.
+- Geçmişte yalnızca puanı saklanan sınavların soru bazında analizi yapılamaz.
+- Mevcut Redis, soru havuzları, öğrenci eşleştirmeleri ve sınav izinleri korunur.
+- Yeni Vercel sunucu fonksiyonu eklenmez, mevcut api/books.mjs genişletilir.
+- Yalnızca son 200 sınav sonucu analiz kapsamındadır.
+- Az sayıda soru ile elde edilen başarı yüzdeleri kesin beceri teşhisi değildir.
+- Soruların havuzu tamamen değiştirildiğinde eski soru kimlikleri farklılaşır;
+  geçmişte etiket bulunmayan eski kayıtlar yeni havuzla eşleştirilemeyebilir.
+
+TEST:
+1. Yönetici paneli > Ayrıntılı Sınav Analizleri > Soru Beceri Etiketleri.
+2. Kitabı seçin; soruların becerilerini atayıp kaydedin.
+3. Analizi yenileyin ve etiketli soruların beceri grafiklerinde göründüğünü kontrol edin.
+4. Öğrenci seçerek güçlü/gelişime açık alanlar ve deneme listesini inceleyin.
+5. Önceki sınavların doğru cevapları yalnızca yönetici panelinde görünmelidir.

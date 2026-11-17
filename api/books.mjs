@@ -4,6 +4,8 @@ import {GAMES} from '../game-manifest.mjs';
 
 
 const ROOT='aip:bookexams:v1';
+const SKILLS={understanding:'Olayları anlama',characters:'Karakterleri yorumlama',causality:'Neden-sonuç kurma',inference:'Çıkarım yapma',mainidea:'Ana fikir ve kişisel yorum'};
+const validSkill=v=>Object.hasOwn(SKILLS,String(v||''));
 const COOKIE_STUDENT='aip_book_student';
 const COOKIE_ADMIN='aip_book_admin';
 const NOW=()=>Math.floor(Date.now()/1000);
@@ -118,7 +120,14 @@ async function handler_start_POST(req){if(!sameOrigin(req))return error('İstek 
   const shuffle=arr=>{for(let i=arr.length-1;i>0;i--){let j=crypto.randomInt(i+1);[arr[i],arr[j]]=[arr[j],arr[i]]}return arr};
   let unseen=shuffle(bank.filter(q=>!seen.has(q.id))),repeat=shuffle(bank.filter(q=>seen.has(q.id)));
   if(unseen.length===0){await redis('DEL',seenKey);unseen=shuffle([...bank]);repeat=[]}
-  const questions=shuffle([...unseen.slice(0,10),...repeat.slice(0,Math.max(0,10-unseen.length))]);
+  // After human review has tagged enough unseen questions, sample 2 per core skill.
+  // Do not sacrifice the student's unseen-question priority for balancing.
+  let picked=[];
+  if(Object.keys(SKILLS).every(k=>unseen.filter(q=>q.skill===k).length>=2)){
+   for(const k of Object.keys(SKILLS))picked.push(...unseen.filter(q=>q.skill===k).slice(0,2));
+  }else picked=unseen.slice(0,10);
+  if(picked.length<10)picked.push(...repeat.slice(0,10-picked.length));
+  const questions=shuffle(picked);
   const created=Date.now(),seconds=examTimer(book),deadlineAt=seconds?created+seconds*1000:null;
   await redis('SET',keys.attempt(id),JSON.stringify({bookId:book.id,sub,created,deadlineAt,questions}),'EX',3600);
   for(const q of questions)await redis('SADD',seenKey,q.id);
@@ -149,7 +158,7 @@ async function handler_submit_POST(req){if(!sameOrigin(req))return error('İstek
  // Question snapshots survive later replacement of the book's question bank.
  const markedAnswers=lateBeyondGrace?Array(attempt.questions.length).fill(null):b.answers;
  const details=attempt.questions.map((q,i)=>({
-  questionId:q.id,type:q.type,question:q.question,
+  questionId:q.id,type:q.type,question:q.question,skill:validSkill(q.skill)?q.skill:null,
   options:q.type==='test'?q.options:undefined,
   studentAnswer:q.type==='test'?(Number.isInteger(Number(markedAnswers[i]))&&markedAnswers[i]!==null&&markedAnswers[i]!==''&&Number(markedAnswers[i])>=0&&Number(markedAnswers[i])<4?Number(markedAnswers[i]):null):String(markedAnswers[i]??'').slice(0,200),
   correctAnswer:q.type==='test'?q.correct:q.answers,
@@ -334,33 +343,79 @@ async function handler_admin_detail_GET(req){try{
 
 async function handler_admin_analysis_GET(req){try{
  requireAdmin(req);
- const id=new URL(req.url).searchParams.get('bookId')||'';
+ const params=new URL(req.url).searchParams;
+ const id=params.get('bookId')||'',filterStudent=params.get('studentId')||'';
  if(id&&!safeId(id))return error('Kitap seçimi geçersiz.',400);
+ if(filterStudent&&(filterStudent.length>200||!/^[A-Za-z0-9_\-]+$/.test(filterStudent)))return error('Öğrenci kimliği geçersiz.',400);
  const raw=await redis('LRANGE',keys.resultList,0,199);
  const all=(raw||[]).map(x=>JSON.parse(x));
- const selected=id?all.filter(r=>r.bookId===id):all;
- // Results remain paginated to the most recent 200; never mislabel this as all-time data.
+ const selected=all.filter(r=>(!id||r.bookId===id)&&(!filterStudent||r.studentId===filterStudent));
  const detailed=selected.filter(r=>/^[a-f0-9-]{36}$/.test(r.id));
  const rawDetails=detailed.length?await redis('MGET',...detailed.map(r=>keys.resultDetail(r.id))):[];
+ const banks=new Map();
+ for(const bookId of new Set(selected.map(r=>r.bookId))){
+  const questions=await getQuestions(bookId);
+  banks.set(bookId,new Map(questions.map(q=>[q.id,q])));
+ }
  const questions=new Map(),typeStats={test:{answered:0,correct:0},bosluk:{answered:0,correct:0}};
- let analyzedAttempts=0;
- for(const text of rawDetails||[]){if(!text)continue;let data;try{data=JSON.parse(text)}catch{continue}
-  if(!Array.isArray(data.questions))continue;analyzedAttempts++;
-  for(const q of data.questions){if(!['test','bosluk'].includes(q.type)||typeof q.question!=='string')continue;
-   const key=data.result.bookId+'|'+q.questionId;
-   const row=questions.get(key)||{bookId:data.result.bookId,questionId:q.questionId,question:q.question,type:q.type,asked:0,correct:0};
+ const skillStats=Object.fromEntries(Object.keys(SKILLS).map(k=>[k,{asked:0,correct:0,attempts:0}]));
+ const studentStats=new Map(), studentTimeline=new Map();
+ let analyzedAttempts=0,unclassified=0;
+ for(const text of rawDetails||[]){if(!text)continue;let detail;try{detail=JSON.parse(text)}catch{continue}
+  if(!Array.isArray(detail.questions)||!detail.result)continue;analyzedAttempts++;
+  const record=detail.result;
+  let studentRow=studentStats.get(record.studentId);
+  if(!studentRow){studentRow={studentId:record.studentId,tests:0,skills:Object.fromEntries(Object.keys(SKILLS).map(k=>[k,{asked:0,correct:0}]))};studentStats.set(record.studentId,studentRow)}
+  studentRow.tests++;
+  const examSkill={};
+  for(const q of detail.questions){if(!['test','bosluk'].includes(q.type)||typeof q.question!=='string')continue;
+   const key=record.bookId+'|'+q.questionId;
+   const row=questions.get(key)||{bookId:record.bookId,questionId:q.questionId,question:q.question,type:q.type,asked:0,correct:0};
    row.asked++;if(q.correct)row.correct++;questions.set(key,row);
    typeStats[q.type].answered++;if(q.correct)typeStats[q.type].correct++;
+   // Prefer the latest human-reviewed bank tag for historical detail. Snapshot is a fallback.
+   const bankQ=banks.get(record.bookId)?.get(q.questionId);
+   const skill=validSkill(bankQ?.skill)?bankQ.skill:(validSkill(q.skill)?q.skill:null);
+   if(!skill){unclassified++;continue}
+   row.skill=skill;
+   skillStats[skill].asked++;if(q.correct)skillStats[skill].correct++;
+   studentRow.skills[skill].asked++;if(q.correct)studentRow.skills[skill].correct++;
+   examSkill[skill]??={asked:0,correct:0};examSkill[skill].asked++;if(q.correct)examSkill[skill].correct++;
   }
+  const list=studentTimeline.get(record.studentId)||[];
+  list.push({id:record.id,bookId:record.bookId,date:record.created,score:record.score,elapsedSeconds:record.elapsedSeconds,skills:examSkill});
+  studentTimeline.set(record.studentId,list);
  }
  const count=selected.length;
+ const labels=await studentLabels([...studentStats.keys()]);
  return out({scope:'last_200_results',totalResults:count,analyzedAttempts,oldResultsWithoutDetail:count-analyzedAttempts,
   averageScore:count?Math.round(selected.reduce((n,r)=>n+(Number(r.score)||0),0)/count*10)/10:null,
   averageSeconds:(()=>{const values=selected.map(r=>r.elapsedSeconds).filter(Number.isFinite);return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):null})(),
-  timedOut:selected.filter(r=>r.timedOut===true).length,
-  typeStats,questions:[...questions.values()].map(q=>({...q,rate:Math.round(100*q.correct/q.asked)})).sort((a,b)=>a.correct/a.asked-b.correct/b.asked||b.asked-a.asked).slice(0,250),
+  timedOut:selected.filter(r=>r.timedOut===true).length,typeStats,unclassified,skillNames:SKILLS,skillStats,
+  questions:[...questions.values()].map(q=>({...q,rate:Math.round(100*q.correct/q.asked)})).sort((a,b)=>a.correct/a.asked-b.correct/b.asked||b.asked-a.asked).slice(0,250),
+  students:[...studentStats.values()].map(s=>({...s,name:labels[s.studentId]?.name||'',externalId:labels[s.studentId]?.externalId||'',timeline:(studentTimeline.get(s.studentId)||[]).sort((a,b)=>a.date.localeCompare(b.date))})).sort((a,b)=>(a.name||a.studentId).localeCompare(b.name||b.studentId,'tr')),
   books:[...new Set(all.map(r=>r.bookId))]
  });
+}catch(e){return respondError(e)}}
+
+// V13.7: Admin-only, explicit human-reviewed skill classification of question banks.
+// Never disclose answer keys to students; skill labels are only in admin endpoints.
+async function handler_admin_skills_GET(req){try{
+ requireAdmin(req);const id=new URL(req.url).searchParams.get('bookId')||'';
+ if(!safeId(id))return error('Kitap seçiniz.',400);
+ const book=await getBook(id);if(!book)return error('Kitap bulunamadı.',404);
+ const bank=await getQuestions(id);
+ return out({bookId:id,skills:SKILLS,questions:bank.map(q=>({id:q.id,type:q.type,question:q.question,skill:validSkill(q.skill)?q.skill:null})),count:bank.length});
+}catch(e){return respondError(e)}}
+async function handler_admin_skills_set_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,65000);
+ if(!safeId(b.bookId)||!Array.isArray(b.changes)||b.changes.length<1||b.changes.length>500)return error('Geçersiz soru grubu.',400);
+ const bank=await getQuestions(b.bookId),book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);
+ const byId=new Map(bank.map(q=>[q.id,q]));const found=new Set();
+ for(const item of b.changes){if(!item||typeof item.id!=='string'||!byId.has(item.id)||found.has(item.id)||!(item.skill===null||validSkill(item.skill)))return error('Hatalı soru veya beceri etiketi.',400);found.add(item.id)}
+ for(const item of b.changes){const q=byId.get(item.id);if(item.skill===null)delete q.skill;else q.skill=item.skill}
+ await redis('SET',keys.questions(b.bookId),JSON.stringify(bank));
+ return out({ok:true,updated:b.changes.length,total:bank.length});
 }catch(e){return respondError(e)}}
 
 // admin-backup
@@ -385,6 +440,8 @@ const handlers = {
   'admin-student-clear': {'POST': handler_admin_student_clear_POST},
   'admin-detail': {'GET': handler_admin_detail_GET},
   'admin-analysis': {'GET': handler_admin_analysis_GET},
+  'admin-skills': {'GET': handler_admin_skills_GET},
+  'admin-skills-set': {'POST': handler_admin_skills_set_POST},
   'admin-backup': {'GET': handler_admin_backup_GET},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
