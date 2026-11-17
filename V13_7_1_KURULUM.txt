@@ -1,0 +1,14 @@
+AİP Oyun Akademisi — V13.7.1 Beceri TXT İçe Aktarma
+
+Bu paket V13.7 üzerinden hazırlanmıştır. Yeni sunucu API dosyası yoktur.
+1. ZIP içindeki SADECE book-exams.js dosyasını GitHub main dalında ana dizine yükleyin.
+2. Commit: V13.7.1 - Beceri etiketlerini TXT dosyasından içe aktarma
+3. Vercel dağıtımı Ready olsun. Yönetici panelini Ctrl+F5 ile yenileyin.
+4. Soru Beceri Etiketleri bölümünde Farklılıklar Adası kitabını seçin ve Soruları getir'e basın.
+5. Farkliliklar_Adasi_147_Beceri_Etiketleri_Ice_Aktar.txt dosyasını seçin ve Dosyadaki etiketleri uygula'ya basın.
+6. 147 etiket hazır uyarısını gördüğünüzde Etiketleri kaydet'e basın.
+7. Etiketli sayısının 147 olduğunu ve analiz raporlarının güncellendiğini kontrol edin.
+
+DİKKAT: Beceri listesi TXT, soru bankası yükleme alanına YAPIŞTIRILMAZ. Mevcut 147 soru silinmez ve yeniden yüklenmez.
+Bu paket, aynı sorular ve aynı soru sırasıyla oluşturulmuş banka içindir. Dosya başka kitaba aitse veya metin farklıysa içe alma işlemi reddedilir.
+Etiketleme soruların ölçtüğü baskın bilişsel beceriye dair eğitimsel bir öneridir; öğretmen incelemesiyle düzenlenebilir.
