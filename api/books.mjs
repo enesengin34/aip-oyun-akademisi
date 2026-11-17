@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {GAMES} from '../game-manifest.mjs';
 // V13.1 consolidated book exam endpoint. All code is server-side.
 
 
@@ -207,6 +208,34 @@ async function handler_admin_retake_POST(req){if(!sameOrigin(req))return error('
  return error('İşlem geçersiz.',400);
 }catch(e){return respondError(e)}}
 
+// V13.4 centralized game switches — public status + authenticated management.
+// Redis set mutations are atomic, and no client-supplied game IDs outside the canonical manifest are accepted.
+const GAME_DISABLED_KEY='aip:games:v1:disabled';
+const GAME_IDS=new Set(GAMES.map(g=>g.id));
+async function gameDisabled(){
+ const result=await redis('SMEMBERS',GAME_DISABLED_KEY);
+ return (Array.isArray(result)?result:[]).filter(id=>GAME_IDS.has(id));
+}
+async function handler_games_status_GET(){try{
+ return out({disabled:await gameDisabled()});
+}catch(e){return respondError(e)}}
+async function handler_admin_games_GET(req){try{
+ requireAdmin(req);
+ const disabled=new Set(await gameDisabled());
+ return out({games:GAMES.map(g=>({...g,active:!disabled.has(g.id)}))});
+}catch(e){return respondError(e)}}
+async function handler_admin_games_set_POST(req){
+ if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);
+ try{
+  requireAdmin(req);
+  const b=await data(req,5000);
+  if(typeof b.active!=='boolean'||!Array.isArray(b.ids)||b.ids.length===0||b.ids.length>GAMES.length||b.ids.some(id=>typeof id!=='string'||!GAME_IDS.has(id)))return error('Geçersiz oyun seçimi.',400);
+  const ids=[...new Set(b.ids)];
+  await redis(b.active?'SREM':'SADD',GAME_DISABLED_KEY,...ids);
+  return out({ok:true,updated:ids.length,disabled:await gameDisabled()});
+ }catch(e){return respondError(e)}
+}
+
 // admin-results
 async function handler_admin_results_GET(req){try{requireAdmin(req);let items=await redis('LRANGE',keys.resultList,0,199);const results=(items||[]).map(x=>JSON.parse(x));return out({results,usage:await recentUsage()})}catch(e){return respondError(e)}}
 
@@ -230,6 +259,9 @@ const handlers = {
   'admin-backup': {'GET': handler_admin_backup_GET},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
+  'games-status': {'GET': handler_games_status_GET},
+  'admin-games': {'GET': handler_admin_games_GET},
+  'admin-games-set': {'POST': handler_admin_games_set_POST},
 };
 
 async function route(req,method) {

@@ -1,0 +1,13 @@
+AİP Oyun Akademisi V13.4 — Oyun Yönetimi
+
+1. ZIP içindeki api/books.mjs dosyasını GitHub api klasörüne koyun.
+2. Ana dizine book-exams.js, app.js, brain-games.js, index.html, game-controls.js ve game-manifest.mjs dosyalarını koyun.
+3. Mevcut api/quiz klasörüne dokunmayın. Eski api/books klasörünü yeniden oluşturmayın.
+4. main dalına commit yapın, Vercel Ready sonucunu kontrol edin.
+5. https://www.oyunakademisi.org/#kitap-sinavlari-yonetim üzerinden yönetici girişi yapın.
+6. Oyun Yönetimi bölümünde oyunları tek tek veya alan bazında aktif/pasif yapın.
+
+Yeni gizli değişken veya ikinci veritabanı gerekmez. Redis, mevcut KV_REST_API_URL ve KV_REST_API_TOKEN ile kullanılır.
+Yapılan değişikliklerin diğer tarayıcılara yansıması sayfa yenileme veya yaklaşık 60 saniyelik durum güncellemesiyle gerçekleşir.
+Yönetim parolası ve sunucu oturumu korunur. Oyun kodları herkese açık olduğundan bu bir görünürlük/normal oyun başlatma kontrolüdür; kodlara doğrudan erişimi engelleyen güvenlik duvarı değildir.
+Hata durumunda oyunlar güncel görünürlük durumunu okuyamazsa yeni oyun açılışı güvenli biçimde durdurulur; bağlantıyı kontrol edin.
