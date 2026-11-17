@@ -1,0 +1,34 @@
+AİP OYUN AKADEMİSİ V13.2 — KURULUM
+
+ÖNEMLİ: Bu ZIP yeni/değişen 8 dosyayı içerir; tüm siteyi değiştirmez. Sırları veya öğrenci kodlarını içermez.
+
+1) Dosyaları ayıklayın.
+2) github.com/enesengin34/aip-oyun-akademisi/upload/main adresini açın.
+3) Klasör yapısını koruyarak 8 dosyayı yükleyin. `api/books.mjs` dosyası GitHub'da `api` klasörünün doğrudan içinde olmalıdır.
+   Diğer 7 dosya proje ana dizinine gider.
+4) Commit directly to main -> Commit changes. Vercel Deployments > Ready durumunu kontrol edin.
+5) GitHub'daki api/quiz/ klasörünü veya var olan Vercel Secrets'ları değiştirmeyin.
+6) ÖNEMLİ: Daha önce kaldırılan api/books/ klasörünü tekrar YÜKLEMEYİN. Vercel Hobby fonksiyon sınırını aşar.
+
+YENİ ÖZELLİKLER:
+- Kitap sınavı: Her öğrenci+kitap için ilk tamamlanan sınavdan sonra başka sınav başlatılması varsayılan olarak engellenir.
+- Yönetici Kitap Sınavları paneli > Son 200 sınav sonucu tablosunda, ilgili kayıt satırından "Tekrar hakkı ver" seçeneğiyle sadece o öğrenci ve kitap için bir yeni deneme açabilir. "İzni kaldır" ile kullanılmamış hak iptal edilir.
+- Öğrenciye Kitap Arkadaşım sayfasında ilk 12 karakterlik takma referans gösterilir; yönetici sonuç tablosunda aynı referansı bulabilir.
+- Tekrar sınavı için 10 soruda öncelikle o öğrenciye aynı kitap için daha önce gösterilmemiş sorular seçilir. Yeni soru kalmadığında tekrar olabilir. Kullanım kaydı özellik yayınlandıktan sonraki sınavları kapsar.
+- Sudoku ve Tangram oyunlarında başlama ekranında "İpuçlarına izin ver" kutusu bulunur.
+- Kitap Sınavları yönetici panelinde son 7 gün sayfa/oyun açılış sayısı ve yaklaşık aktif süre gösterilir. Kullanım anonim toplulaştırılır, eski veriler geriye dönük oluşmaz.
+
+KONTROL LİSTESİ:
+- Vercel Ready.
+- Yönetici paneli açılıyor, önceki kitap ve 140 soru duruyor.
+- Öğrenci önceki tamamladığı sınava tekrar giremiyor, yöneticiden tek deneme izni alabiliyor.
+- Aynı öğrenci farklı kitaba ilk kez girebiliyor.
+- İpuçları kapalı Sudoku ve Tangram oynanabiliyor.
+- Yönetici son 7 gün istatistik kartını görüyor (ilk yayında boş olması normal).
+
+TEKNİK NOTLAR:
+- Ücretsiz Vercel Hobby planı için yeni sunucu fonksiyonu eklenmedi; mevcut tek api/books.mjs dosyası güncellendi.
+- Sınav sonuçları ve sorular Redis üzerinde aynı anahtar alanında korunuyor. Veritabanı sıfırlanmaz.
+- Öğrenci referansı bir giriş kodu değildir, yönetici tarafından ilgili sonucu seçmek için kullanılır.
+- Görünür ekrandaki kullanım süreleri yaklaşık değerlerdir; kullanıcının kimliğiyle ilişkilendirilmez.
+- Sunucu tests: tekrar izni ve soru tekrarını azaltma sentetik Redis testi başarılı; JS sözdizimi kontrolleri başarılı. Canlı doğrulama yükleme sonrası yapılmalıdır.
