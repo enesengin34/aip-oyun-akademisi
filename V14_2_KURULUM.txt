@@ -1,0 +1,30 @@
+AİP OYUN AKADEMİSİ V14.2 — KİTAP SINAVI DEĞERLENDİRME DÜZELTMELERİ
+
+Bu paket V14.1 üzerine uygulanır. Yalnızca iki dosya değişir:
+  book-exams.js  → GitHub deposunun ana dizini
+  api/books.mjs  → GitHub deposunun api klasörü
+
+Güncellemeler:
+1. Boşluk doldurma doğru cevabının önünde yanlış görünen “Boş bırakılmış” ifadesi kaldırıldı.
+2. Son 200 sınav için sayı–yazı eşdeğerliğiyle güvenli yeniden değerlendirme:
+   Yönetici > Ayrıntılı Sınav Analizleri > “Eski sayı cevaplarını yeniden değerlendir”
+   Önce etkilenen sonuçların sayısı gösterilir; yalnızca onaydan sonra uygulanır.
+   Elle değerlendirilmiş soru kayıtları korunur. İşlem denetim geçmişine yazılır.
+3. Yönetici cevabı doğru/yanlış olarak değiştirdiğinde panel sonuçları ve analizleri yeniden yüklenir.
+4. Yeni sınavlar için önceki sürümdeki “5” / “Beş” kontrolü korunur.
+
+Kapsam sınırları:
+- Toplu değerlendirme yalnızca en son 200 sınavı inceler. Daha önce soru ayrıntısı hiç kaydedilmeyen sınavları geriye dönük düzeltmez.
+- Toplu otomatik düzeltme sadece daha önce yanlış işaretlenmiş sayısal eşdeğer boşluk doldurma cevaplarını DOĞRU'ya çevirir; doğruyu yanlışa çeviremez.
+- Elle değerlendirilmiş sorular otomatik güncellenmez.
+- Öğrenci kodlu oyun giriş sistemi ve skor tabloları henüz bu pakete dahil DEĞİLDİR; oyun bazlı tamamlama/doğrulama, öğrenci hesapları ve gizlilik ayarları için ayrıca geliştirilmesi gerekir.
+
+Kurulum:
+1. ZIP'i açın.
+2. İki dosyayı belirtilen konumlarına GitHub'daki main dalına yükleyin.
+3. Commit: V14.2 - Sinav degerlendirme ve gecmis puan duzeltme
+4. Vercel dağıtımı Ready olunca yönetici panelini yenileyin.
+5. Önce sayı cevaplarını yeniden değerlendirme önizlemesini inceleyin; sonuçlar doğruysa onaylayın.
+6. Bir örnek sınavda “Doğru cevap: Beş” ifadesini ve yeniden hesaplanan puanı kontrol edin.
+
+Güvenlik: Yönetici kontrolleri sunucu tarafındadır, mevcut Redis kayıtları ve oturum şifreleri değiştirilmez.

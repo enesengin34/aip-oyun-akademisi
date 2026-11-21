@@ -504,6 +504,45 @@ async function handler_admin_answer_review_POST(req){if(!sameOrigin(req))return 
  return out({ok:true,result:detail.result,review:edit});
 }catch(e){return respondError(e)}}
 
+// V14.2: preview/apply number-word regrading, without overwriting manual reviews.
+// The original student answer and every review note remain immutable.
+async function handler_admin_regrade_numbers_POST(req){
+ if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);
+ try{
+  requireAdmin(req);
+  const b=await data(req,1000);
+  if(b.apply!==true&&b.apply!==false)return error('İşlem türü geçersiz.',400);
+  const rows=await redis('LRANGE',keys.resultList,0,199);
+  let eligible=0,changedExams=0,changedAnswers=0,manualSkipped=0,oldWithoutDetails=0,failed=0;
+  // Restrict to 200 results in line with the existing dashboard and Vercel execution limits.
+  for(let pos=0;pos<rows.length;pos++){
+   let record,detail;
+   try{record=JSON.parse(rows[pos]);const raw=await redis('GET',keys.resultDetail(record.id));if(!raw){oldWithoutDetails++;continue}detail=JSON.parse(raw)}catch{failed++;continue}
+   if(!Array.isArray(detail.questions)||detail.result?.id!==record.id){failed++;continue}
+   let changes=0;
+   const manuallyReviewed=new Set((detail.reviews||[]).map(r=>r.questionIndex));
+   for(let i=0;i<detail.questions.length;i++){
+    const q=detail.questions[i];if(q.type!=='bosluk'||q.correct===true)continue;
+    if(manuallyReviewed.has(i)){manualSkipped++;continue}
+    if(!Array.isArray(q.correctAnswer)||!q.correctAnswer.some(expected=>equivalentShortAnswer(q.studentAnswer,expected)))continue;
+    eligible++;changes++;
+    if(b.apply){q.correct=true;detail.reviews=[...(detail.reviews||[]),{at:new Date().toISOString(),questionIndex:i,questionId:q.questionId,oldCorrect:false,newCorrect:true,reason:'V14.2: Türkçe sayı ve rakam eşdeğerliğiyle otomatik yeniden değerlendirme',kind:'automatic-number-equivalence'}].slice(-100)}
+   }
+   if(!changes)continue;
+   changedExams++;changedAnswers+=changes;
+   if(!b.apply)continue;
+   const newCorrect=detail.questions.reduce((n,q)=>n+(q.correct===true?1:0),0);
+   detail.result.correct=newCorrect;detail.result.score=Math.round(newCorrect/detail.questions.length*100);
+   // Preserve previously stored metadata (elapsed time, book/student refs, etc.).
+   await redis('SET',keys.resultDetail(record.id),JSON.stringify(detail));
+   await redis('LSET',keys.resultList,pos,JSON.stringify(detail.result));
+   const latest=await redis('GET',keys.studentResult(record.studentId,record.bookId));
+   if(latest){try{if(JSON.parse(latest).id===record.id)await redis('SET',keys.studentResult(record.studentId,record.bookId),JSON.stringify(detail.result))}catch{}}
+  }
+  return out({ok:true,mode:b.apply?'applied':'preview',examCount:changedExams,answerCount:changedAnswers,manualSkipped,oldWithoutDetails,failed,scanned:rows.length});
+ }catch(e){return respondError(e)}
+}
+
 // admin-backup
 async function handler_admin_backup_GET(req){try{requireAdmin(req);let books=await getBooks();let payload=await Promise.all(books.map(async b=>({book:b,questions:await getQuestions(b.id)})));return out({created:new Date().toISOString(),version:1,data:payload})}catch(e){return respondError(e)}}
 
@@ -533,6 +572,7 @@ const handlers = {
   'admin-question-bank': {'GET': handler_admin_question_bank_GET},
   'admin-question-edit': {'POST': handler_admin_question_edit_POST},
   'admin-answer-review': {'POST': handler_admin_answer_review_POST},
+  'admin-regrade-numbers': {'POST': handler_admin_regrade_numbers_POST},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
   'games-status': {'GET': handler_games_status_GET},
