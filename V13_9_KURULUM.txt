@@ -1,0 +1,23 @@
+AİP OYUN AKADEMİSİ — V13.9 ÖĞRENCİ SINAV DOSYASI
+
+Bu paket V13.8 sürümü üzerine uygulanmak içindir.
+
+1. ZIP içindeki book-exams.js dosyasını GitHub deposunun ANA dizinindeki
+   aynı isimli dosyanın yerine yükleyin.
+2. api/books.mjs ve diğer dosyaları DEĞİŞTİRMEYİN.
+3. Commit açıklaması: V13.9 - Ogrenci sinav dosyasi ve renkli cevaplar
+4. Vercel -> Deployments -> Ready durumunu doğrulayın.
+5. https://www.oyunakademisi.org/#kitap-sinavlari-yonetim
+6. Yönetici parolasıyla giriş yapıp 'Öğrenci Sınav Dosyası' bölümünü açın.
+7. Öğrenci arayın/seçin, kitabın altındaki denemeyi açın, soruların
+   doğru/yanlış/boş renkleri ile beceri özetini kontrol edin.
+
+KAPSAM VE SINIRLAR
+- Aynı kitabın farklı denemeleri ayrı satırlarda görüntülenir.
+- 'Bütün sınavlardaki beceri profili' sadece ayrıntılı cevabı bulunan
+  ve beceri etiketi eşleştirilebilen kayıtlardan hesaplanır.
+- Sunucu şu an son 200 sınav sonucunu döndürür. Daha eski tüm sınavların
+  taranabilmesi için gelecekte API sayfalaması gereklidir.
+- V13.6 öncesi ayrıntılı soru kayıtları geriye getirilemez.
+- Cevap anahtarı yalnızca yönetici oturumuyla erişilen API'den alınır.
+- Bu sürüm soru bankasını, öğrenci kayıtlarını ve Redis'i değiştirmez.
