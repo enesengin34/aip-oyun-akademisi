@@ -2,7 +2,7 @@
 /* AİP Oyun Akademisi — Hedef 5, 8 sütun x 7 satır, ilk beşliyi tamamlayan kazanır. */
 const Hedef5 = (() => {
   const ROWS = 7, COLS = 8, TARGET = 5;
-  let match = null;
+  let match = null; let mode='friend',level='normal',reported=false,thinking=false;
   const $ = id => document.getElementById(id);
   const players = { 1: 'Kırmızı', 2: 'Mavi' };
   const at = (r,c) => r * COLS + c;
@@ -20,13 +20,19 @@ const Hedef5 = (() => {
     }
     return null;
   }
+  function setup(){const app=$('app');app.innerHTML=`<section class="h5-panel"><div class="brain-toolbar"><button type="button" class="secondary" id="h5-back">← Akıl-Zekâ</button></div><h1>🎯 Hedef 5 — Oyun Ayarları</h1><form id="h5-options" class="puz-option-row"><label>Oyun şekli<select name="mode"><option value="computer">Bilgisayara karşı</option><option value="friend">İki kişi</option></select></label><label>Bilgisayar zorluğu<select name="level"><option value="easy">Kolay</option><option value="normal" selected>Orta</option><option value="hard">Zor</option></select></label><button class="v12-btn v12-btn-accent">Oyuna başla</button></form></section>`;$('h5-back').onclick=()=>Brain.list();const f=$('h5-options');f.elements.mode.onchange=()=>f.elements.level.disabled=f.elements.mode.value==='friend';f.onsubmit=e=>{e.preventDefault();mode=f.elements.mode.value;level=f.elements.level.value;reported=false;thinking=false;newGame();};}
+  function record(){if(reported||mode!=='computer')return;reported=true;AIPBrainScores?.finish('hedef5',level,match.winner===0?'draw':match.winner===1?'win':'loss');}
+  function available(b){return Array.from({length:COLS},(_,i)=>i).filter(c=>b[c]===0)}
+  function withDrop(board,col,player){const b=board.slice();for(let r=ROWS-1;r>=0;r--)if(b[at(r,col)]===0){b[at(r,col)]=player;return b;}return b;}
+  function aiPlay(){if(!match||match.finished||match.current!==2){thinking=false;return;}let can=available(match.board);if(!can.length){thinking=false;return;}let col=can[Math.floor(Math.random()*can.length)];if(level!=='easy'){const win=can.find(c=>winningLine(withDrop(match.board,c,2),2));const block=can.find(c=>winningLine(withDrop(match.board,c,1),1));if(win!==undefined)col=win;else if(block!==undefined)col=block;else{const score=c=>{const b=withDrop(match.board,c,2);let z=COLS/2-Math.abs(COLS/2-c);for(let r=0;r<ROWS;r++)for(let j=0;j<COLS;j++)if(b[at(r,j)]===2)for(const [dr,dc] of [[1,0],[0,1],[1,1],[1,-1]]){let rr=r+4*dr,cc=j+4*dc;if(rr<0||rr>=ROWS||cc<0||cc>=COLS)continue;let line=Array.from({length:5},(_,k)=>b[at(r+k*dr,j+k*dc)]);if(!line.includes(1))z+=Math.pow(line.filter(v=>v===2).length,2)*0.06;}return z+Math.random()*(level==='hard'?.02:2.5);};col=can.sort((a,b)=>score(b)-score(a))[0];}}thinking=false;drop(col,true);}
   function newGame() {
+    reported=false;thinking=false;if(mode==='computer')AIPBrainScores?.begin('hedef5',level);
     match = {board: Array(ROWS*COLS).fill(0), current: 1, moves:0,
       winner:0, winningCells:[], finished:false, last:-1, message:''};
     render();
   }
-  function drop(col) {
-    if(!match || match.finished || !Number.isInteger(col) || col<0 || col>=COLS) return false;
+  function drop(col,automated=false) {
+    if(!match || match.finished || thinking || (mode==='computer'&&match.current===2&&!automated) || !Number.isInteger(col) || col<0 || col>=COLS) return false;
     let row=ROWS-1;
     while(row>=0 && match.board[at(row,col)]!==0) row--;
     if(row<0) {match.message='Bu sütun dolu. Başka bir sütun seçin.';updateStatus();return false;}
@@ -39,7 +45,7 @@ const Hedef5 = (() => {
     if(line) {match.finished=true;match.winner=player;match.winningCells=line;}
     else if(match.moves===ROWS*COLS) {match.finished=true;match.winner=0;}
     else match.current=player===1?2:1;
-    render();
+    render();if(match.finished)record();else if(mode==='computer'&&match.current===2){thinking=true;setTimeout(aiPlay,210);}
     return true;
   }
   function updateStatus() {
@@ -59,16 +65,16 @@ const Hedef5 = (() => {
     }).join('');
     const board=match.board.map((p,i)=>`<div class="h5-slot ${match.winningCells.includes(i)?'h5-winning':''} ${match.last===i?'h5-last':''}" role="gridcell" aria-label="${Math.floor(i/COLS)+1}. satır ${i%COLS+1}. sütun: ${p?players[p]:'boş'}"><span class="h5-disc ${p===1?'h5-red':p===2?'h5-blue':''}"></span></div>`).join('');
     app.innerHTML=`<section class="h5-panel"><div class="brain-toolbar"><button type="button" class="secondary" id="h5-back">← Akıl-Zekâ</button><button type="button" class="secondary" id="h5-new">↻ Yeni oyun</button></div>
-      <div class="h5-heading"><div><span class="v12-eyebrow">STRATEJİ OYUNU · İKİ OYUNCU</span><h1>🎯 Hedef 5</h1><p>Bir sütun seç, taşın en alt boş yere düşsün. Yatay, dikey veya çapraz <strong>ilk 5 taşı</strong> yan yana getiren kazanır.</p></div><div class="h5-current" id="h5-turn"></div></div>
+      <div class="h5-heading"><div><span class="v12-eyebrow">STRATEJİ OYUNU · ${mode==='computer'?'BİLGİSAYARA KARŞI':'İKİ OYUNCU'}</span><h1>🎯 Hedef 5</h1><p>Bir sütun seç, taşın en alt boş yere düşsün. Yatay, dikey veya çapraz <strong>ilk 5 taşı</strong> yan yana getiren kazanır.</p></div><div class="h5-current" id="h5-turn"></div></div>
       <div class="h5-score"><span>🔴 Kırmızı: <strong>${used[1]}/28</strong></span><span>🔵 Mavi: <strong>${used[2]}/28</strong></span><span id="h5-count"></span></div>
       <div class="h5-wrap"><div class="h5-game" aria-label="8 sütunlu 7 satırlı Hedef 5 tahtası"><div class="h5-drops">${arrows}</div><div class="h5-grid" role="grid" aria-label="Taşların bulunduğu oyun tahtası">${board}</div></div></div>
-      <div class="h5-status" id="h5-status" role="status" aria-live="polite"></div>
+      <div class="h5-status" id="h5-status" role="status" aria-live="polite"></div><div id="h5-leader" class="puz-note"></div>
       <details class="h5-rules"><summary>📖 Nasıl oynanır?</summary><p>İki oyuncu aynı cihazda sırayla oynar. Sırası gelen oyuncu, üstteki sekiz sütundan birini seçer. Taşı o sütundaki en alt boş yere yerleşir. Yatay, dikey veya çapraz art arda ilk beş taşını oluşturan oyuncu hemen kazanır. Dolu sütuna taş bırakılamaz. Tahta dolarsa ve beşli oluşmamışsa oyun berabere biter.</p></details>
       </section>`;
     app.querySelectorAll('[data-col]').forEach(btn=>btn.addEventListener('click',()=>drop(Number(btn.dataset.col))));
     $('h5-back').addEventListener('click',()=>Brain.list());
     $('h5-new').addEventListener('click',newGame);
-    updateStatus();
+    updateStatus();if(mode==='computer')AIPBrainScores?.board('hedef5',level,'h5-leader');
   }
-  return {open:newGame,drop,winningLine,dimensions:{rows:ROWS,cols:COLS,target:TARGET}};
+  return {open:setup,drop,winningLine,dimensions:{rows:ROWS,cols:COLS,target:TARGET}};
 })();

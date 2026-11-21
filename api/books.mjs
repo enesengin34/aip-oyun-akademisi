@@ -595,7 +595,7 @@ async function handler_game_board_GET(req){try{
 
 // V14.4 — Initial Akıl-Zekâ tracking: OXO, Reversi and Sudoku only.
 // Results are reported by the browser; NOT suitable for official competition rankings.
-const BRAIN_TYPES={oxo:'OXO',reversi:'Reversi',sudoku:'Sudoku'};
+const BRAIN_TYPES={oxo:'OXO',reversi:'Reversi',sudoku:'Sudoku',checkers:'Dama',morris:'Dokuz Taş',quoridor:'Koridor',chess:'Satranç',mangala:'Mangala',pentago:'Pentago',hedef5:'Hedef 5'};
 const BRAIN_LEVELS=['easy','normal','hard'];
 const BRAIN_DIFFICULTY=['kolay','normal','zor'];
 const brainRunKey=t=>`aip:brain:v144:run:${t}`;

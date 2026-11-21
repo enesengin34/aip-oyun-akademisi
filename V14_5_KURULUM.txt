@@ -1,0 +1,53 @@
+AIP OYUN AKADEMISI V14.5 - AKIL ZEKA STRATEJI OYUNLARI
+===================================================
+TEMEL: V14.4'in calistigi mevcut site. Bu paket V14.5 guncellemesidir.
+
+GUNCELLENEN DOSYALAR (5)
+Kok dizine yukle:
+- brain-games.js
+- puzzle-games.js
+- hedef5.js
+- book-exams.js
+api klasorune yukle:
+- api/books.mjs
+
+GITHUB:
+https://github.com/enesengin34/aip-oyun-akademisi/upload/main
+Commit: V14.5 - Akil Zeka Bilgisayar Rakipleri
+
+KAPSAM:
+* OXO ve Reversi: V14.4'teki mevcut 3 seviye ve iki kisilik mod korunur.
+* Dama, Dokuz Tas, Koridor, Satranc, Mangala, Pentago, Hedef 5:
+  bilgisayara karsi kolay/orta/zor ve ayni cihazda iki kisilik mod.
+* Bilgisayara karsi kaydedilen win/loss/draw sonuclari mevcut Redis'e
+  ve yonetici panelindeki Akil-Zeka Performanslari bolumune gider.
+* Yonetici panelinde 9 strateji oyununun filtreleri vardir.
+* Sudoku: V14.4'teki boyut/zorluk bazli sure siralamasi korunur.
+* Tangram ve Desen Kupleri: HENUZ iki kisilik sure duellosu yoktur.
+
+ONEMLI SINIRLAR:
+- Bilgisayar rakipleri tarayici ici kurallar ve basit/orta sezgisel
+  algoritmalar kullanir. Uc zorluk seviyesi profesyonel motor gucu
+  ya da resmi ELO seviyeleri anlamina gelmez.
+- Koridor bilgisayari bu surumde yasal piyon hamleleri yapar;
+  kendi duvar yerlestirme stratejisi henuz gelismis degildir.
+- Sonuclar tarayicidan bildirilir: resmi/odullu yarismalarda
+  dogrulanmis skor olarak kullanilmamalidir.
+- Kisiye ozel performanslar, ogrenci Kitap Arkadasim kodu ile
+  oturum actiginda kaydedilir. Ogrenci kodu zorunlu degildir,
+  girilmezse oyun calisir ama performans kaydedilmez.
+- Iki kisilik modda kazanan ogrenci otomatik olarak saptanamaz;
+  istatistikler yalnizca bilgisayara karsi modda kaydedilir.
+
+KONTROL:
+1. Vercel Ready.
+2. Dama oyununu ac -> Bilgisayara karsi / Orta -> oyunu baslat.
+   Kirmizi tasi hareket ettirince mavi bilgisayarin hamlesini bekle.
+3. Ayni oyunda Iki kisi modunu ac, iki tarafin elle oynadigini dogrula.
+4. Hedef 5 / Mangala / Pentago ve Satranc icin de birer hamle dene.
+5. Kitap Sinavlari Yonetici Paneli -> Akil-Zeka Performanslari:
+   kayitli bir oyun bitirildiginde sonuc gorunur.
+6. Gerekirse eski surume donmek icin V14.4 dosyalarini geri yukleyin.
+
+DOSYALARIN SOZDIZIMI VE YEREL HAMLE TESTLERI KONTROL EDILMISTIR.
+CANLI SITE/REDIS TESTI YAPILMAMISTIR.
