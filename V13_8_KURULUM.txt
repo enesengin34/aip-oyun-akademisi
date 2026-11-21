@@ -1,0 +1,31 @@
+AİP Oyun Akademisi V13.8 — Kitap başına sınav soru sayısı (5–30)
+
+İÇERİK
+  book-exams.js       -> Proje ana dizini
+  api/books.mjs       -> Projedeki api/ klasörü
+
+KURULUM
+1. GitHub'da main dalına bu iki dosyayı aynı dizin konumlarını koruyarak yükleyin.
+2. Commit: V13.8 - Kitap sınavı soru sayısı yönetimi
+3. Vercel dağıtımı Ready olunca gizli yönetici paneline girin:
+   https://www.oyunakademisi.org/#kitap-sinavlari-yonetim
+4. Kitaplar bölümünde her kitap altındaki 'Sınavdaki soru sayısı' menüsünden
+   5–30 arasında bir sayı seçip 'Soru sayısını kaydet' düğmesine basın.
+5. Ayar kaydedilmemiş eski kitapların yeni başlangıç değeri 20 sorudur.
+   Eski 10 soruluk sonuçlar saklanır; başlamış sınav 10 soru olarak devam eder.
+6. Öğrenci ekranında 20 soruluk bir sınav başlatıp tamamlayın. Yönetici
+   sonuç tablosunda toplam soru sayısı ve beceri analizini kontrol edin.
+
+ÖZELLİKLER
+- Soru sayısı kitap bazındadır; değiştirmek için yeniden dağıtım gerekmez.
+- Yeni sınav başlangıcında sunucu soru sayısını ve soruları sabitler.
+- Öğrencinin önce görmediği sorulara öncelik verir.
+- Beş beceriden dengeli seçim, yeterli sayıda yeni etiketli soru varsa çalışır.
+- Sınav süresi ayarı kitaptan bağımsızdır, var olan süreler değişmez.
+- Test / BOSLUK türleri, öğrenci kimlikleri ve sonuç analizleri korunur.
+- Sunucuda cevap sayısı sınavın gerçekten seçilmiş soru sayısıyla eşleştirilir.
+- Yönetici dışındaki kullanıcılar soru sayısı ayarını değiştiremez.
+
+DİKKAT
+30 soruluk sınav için mevcut süre ayarlarının yeterli olduğundan emin olun.
+Eski öğrenci sınavlarının doğru cevapları veya kayıtları değiştirilmez.

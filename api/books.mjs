@@ -32,7 +32,9 @@ function requireAdmin(req){if(!admin(req))throw Object.assign(new Error('Yöneti
 function respondError(e){return error(e.status?e.message:'Sunucu işlemi tamamlanamadı.',e.status||503)}
 function safeId(v){return /^[a-z0-9-]{5,55}$/.test(str(v))}
 function examTimer(book){const v=Number(book?.timerSeconds);return book?.timed===true&&Number.isInteger(v)&&v>=10&&v<=3599?v:null}
-function publicBook(b){return {id:b.id,title:b.title,author:b.author,grade:b.grade,active:b.active,count:b.count,timed:examTimer(b)!==null,timerSeconds:examTimer(b)||0}}
+// All pre-existing books default to 20 until the manager chooses otherwise.
+function examCount(book){const n=Number(book?.examQuestionCount);return Number.isInteger(n)&&n>=5&&n<=30?n:20}
+function publicBook(b){return {id:b.id,title:b.title,author:b.author,grade:b.grade,active:b.active,count:b.count,examQuestionCount:examCount(b),timed:examTimer(b)!==null,timerSeconds:examTimer(b)||0}}
 async function getBook(id){if(!safeId(id))return null;let s=await redis('GET',keys.book(id));return s?JSON.parse(s):null}
 async function getBooks(){let ids=JSON.parse((await redis('GET',keys.index))||'[]');let b=await Promise.all(ids.map(getBook));return b.filter(Boolean)}
 async function getQuestions(id){return JSON.parse((await redis('GET',keys.questions(id)))||'[]')}
@@ -105,7 +107,7 @@ async function handler_start_POST(req){if(!sameOrigin(req))return error('İstek 
  const sub=await requireStudent(req),b=await data(req,1000),book=await getBook(b.bookId);
  if(!book||!book.active||book.count<100)return error('Bu kitap sınavı aktif değil.',404);
  const completedKey=keys.studentResult(sub,book.id),retakeKey=keys.retake(sub,book.id),lockKey=keys.activeAttempt(sub,book.id);
- let bank=await getQuestions(book.id);if(bank.length<100)return error('Soru havuzu eksik.',409);
+ let bank=await getQuestions(book.id);if(bank.length<100)return error('Soru havuzu eksik.',409);const questionCount=examCount(book);if(bank.length<questionCount)return error('Seçilen sınav için yeterli soru yok.',409);
  const existing=await redis('GET',lockKey);
  if(existing){const raw=await redis('GET',keys.attempt(existing));if(raw){let old=JSON.parse(raw);if(old.sub===sub&&old.bookId===book.id)return out({attemptId:existing,book:publicBook(book),questions:publicQuestions(old.questions),startedAt:old.created,deadlineAt:old.deadlineAt||null});}await redis('DEL',lockKey)}
  const id=crypto.randomUUID();
@@ -120,13 +122,15 @@ async function handler_start_POST(req){if(!sameOrigin(req))return error('İstek 
   const shuffle=arr=>{for(let i=arr.length-1;i>0;i--){let j=crypto.randomInt(i+1);[arr[i],arr[j]]=[arr[j],arr[i]]}return arr};
   let unseen=shuffle(bank.filter(q=>!seen.has(q.id))),repeat=shuffle(bank.filter(q=>seen.has(q.id)));
   if(unseen.length===0){await redis('DEL',seenKey);unseen=shuffle([...bank]);repeat=[]}
-  // After human review has tagged enough unseen questions, sample 2 per core skill.
-  // Do not sacrifice the student's unseen-question priority for balancing.
+  // Prefer never-before-seen questions; when all five skill pools allow it,
+  // distribute any selected length (5..30) as evenly as possible among skills.
   let picked=[];
-  if(Object.keys(SKILLS).every(k=>unseen.filter(q=>q.skill===k).length>=2)){
-   for(const k of Object.keys(SKILLS))picked.push(...unseen.filter(q=>q.skill===k).slice(0,2));
-  }else picked=unseen.slice(0,10);
-  if(picked.length<10)picked.push(...repeat.slice(0,10-picked.length));
+  const skillKeys=shuffle(Object.keys(SKILLS));
+  const need=Object.fromEntries(skillKeys.map((k,i)=>[k,Math.floor(questionCount/skillKeys.length)+(i<questionCount%skillKeys.length?1:0)]));
+  if(skillKeys.every(k=>unseen.filter(q=>q.skill===k).length>=need[k])){
+   for(const k of skillKeys)picked.push(...unseen.filter(q=>q.skill===k).slice(0,need[k]));
+  }else picked=unseen.slice(0,questionCount);
+  if(picked.length<questionCount)picked.push(...repeat.slice(0,questionCount-picked.length));
   const questions=shuffle(picked);
   const created=Date.now(),seconds=examTimer(book),deadlineAt=seconds?created+seconds*1000:null;
   await redis('SET',keys.attempt(id),JSON.stringify({bookId:book.id,sub,created,deadlineAt,questions}),'EX',3600);
@@ -139,10 +143,11 @@ function publicQuestions(questions){return questions.map(q=>({id:q.id,type:q.typ
 // submit
 async function handler_submit_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
  const sub=await requireStudent(req),b=await data(req,10000);
- if(!/^[a-f0-9-]{36}$/.test(String(b.attemptId||''))||!Array.isArray(b.answers)||b.answers.length!==10)return error('Geçersiz sınav gönderimi.',400);
+ if(!/^[a-f0-9-]{36}$/.test(String(b.attemptId||''))||!Array.isArray(b.answers)||b.answers.length<5||b.answers.length>30)return error('Geçersiz sınav gönderimi.',400);
  // Check owner before consuming. GETDEL atomically consumes an attempt once.
  let first=await redis('GET',keys.attempt(b.attemptId));if(!first)return error('Sınav süresi dolmuş veya sınav gönderilmiş.',410);
  if(JSON.parse(first).sub!==sub)return error('Yetkisiz sınav.',403);
+ if(JSON.parse(first).questions?.length!==b.answers.length)return error('Cevap sayısı sınavın soru sayısıyla eşleşmiyor.',400);
  let raw=await redis('GETDEL',keys.attempt(b.attemptId));if(!raw)return error('Sınav süresi dolmuş veya sınav gönderilmiş.',410);
  let attempt=JSON.parse(raw);if(attempt.sub!==sub)return error('Yetkisiz sınav.',403);
  if(attempt.created>Date.now()||Date.now()-attempt.created>3600000)return error('Sınav süresi dolmuş.',410);
@@ -183,7 +188,7 @@ async function handler_admin_login_POST(req){if(!sameOrigin(req))return error('�
 async function handler_admin_create_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
  requireAdmin(req);const b=await data(req,5000);const title=String(b.title||'').trim(),author=String(b.author||'').trim();let grade=Number(b.grade)||0;
  if(title.length<2||title.length>130||author.length>100||grade<0||grade>4)return error('Kitap bilgileri geçersiz.',400);
- let id=slug(title),book={id,title,author,grade,active:false,count:0,created:new Date().toISOString()};
+ let id=slug(title),book={id,title,author,grade,active:false,count:0,examQuestionCount:20,created:new Date().toISOString()};
  await redis('SET',keys.book(id),JSON.stringify(book));await redis('SET',keys.questions(id),'[]');
  let all=JSON.parse((await redis('GET',keys.index))||'[]');all.push(id);await redis('SET',keys.index,JSON.stringify(all));return out({book});
  }catch(e){return respondError(e)}}
@@ -204,6 +209,15 @@ async function handler_admin_import_POST(req){if(!sameOrigin(req))return error('
 // admin-toggle
 async function handler_admin_toggle_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{requireAdmin(req);const b=await data(req,1000),book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);if(b.active===true&&book.count<100)return error('Sınavı açmak için en az 100 soru gerekiyor.',409);book.active=b.active===true;await redis('SET',keys.book(book.id),JSON.stringify(book));return out({ok:true,book});}catch(e){return respondError(e)}}
 
+
+// Admin-only per-book question count. Never retroactively changes an active attempt.
+async function handler_admin_question_count_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,1200),book=await getBook(b.bookId);
+ if(!book)return error('Kitap bulunamadı.',404);
+ if(!Number.isInteger(b.count)||b.count<5||b.count>30)return error('Soru sayısı 5 ile 30 arasında tam sayı olmalıdır.',400);
+ book.examQuestionCount=b.count;await redis('SET',keys.book(book.id),JSON.stringify(book));
+ return out({ok:true,book:publicBook(book)});
+}catch(e){return respondError(e)}}
 
 // Per-book timer settings. Changes affect future attempts; existing attempts retain their original deadline.
 async function handler_admin_timer_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
@@ -434,6 +448,7 @@ const handlers = {
   'admin-import': {'POST': handler_admin_import_POST},
   'admin-toggle': {'POST': handler_admin_toggle_POST},
   'admin-timer': {'POST': handler_admin_timer_POST},
+  'admin-question-count': {'POST': handler_admin_question_count_POST},
   'admin-results': {'GET': handler_admin_results_GET},
   'admin-student-bind': {'POST': handler_admin_student_bind_POST},
   'admin-student-roster': {'GET': handler_admin_student_roster_GET},
