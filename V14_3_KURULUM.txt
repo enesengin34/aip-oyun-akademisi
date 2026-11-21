@@ -1,0 +1,32 @@
+AIP OYUN AKADEMISI — V14.3 / Egitici Oyun Performansi (pilot)
+
+ICERIK:
+- api/books.mjs : mevcut tek API'ye oyun oturumu, sonuc kaydi, yonetici performans ve skor gorunurlugu eklendi.
+- app.js : egitici oyunlarin baslangic ve 5-soruluk tamamlanma olaylarina kayit eklendi.
+- book-exams.js : yonetici paneline oyun performans listesi ve skor tablosu ayarlari eklendi.
+- game-scores.js : YENI dosya. Oyun girisi, performans gonderimi, ogrenciye acik tablo.
+- index.html : yeni game-scores.js dosyasini yukler.
+
+YUKLEME:
+1) ZIP dosyasini ayiklayin. ZIP dosyasini oldugu gibi GitHub'a yuklemeyin.
+2) index.html, app.js, book-exams.js, game-scores.js dosyalarini GitHub ana dizinine yukleyin.
+3) api/books.mjs dosyasini GitHub api klasorune yukleyin.
+4) Commit directly to main yapin ve Vercel Ready olduktan sonra test edin.
+5) Mevcut KITAP_ARKADASIM_ ve KV_ ortam degiskenleri korunur. Yeni degisken gerekmez.
+
+TEST:
+- Ogrenci koduyla bir egitici oyunu (ornegin 'Nesneleri Say') acin.
+- 5 etkinligi tamamlayin. Kayit onayinin geldiginizi kontrol edin.
+- Yonetici paneli > Egitici Oyun Performanslari V14.3 alanina bakin.
+- Eslesmis ogrenciler isimleriyle gorunmeli. Ac/kapat ve Ilk 5/10 ayarini deneyin.
+
+SINIRLAR / GUVENLIK:
+- 49 egitici oyun icin ilk asama. Sudoku, Tangram, satranc vb 12 akil-zeka oyunu bu pakette takip edilmez.
+- Oyun puanlari tarayici kaynaklidir; sunucu oturumu, sure siniri ve tek-seferlik kayit kontrolu olsa da hileye karsi kriptografik garanti yoktur. Resmi/odullu siralama olarak kullanmayin.
+- Egitici oyunlarda yanlis yanit tekrar denenebildiginden genellikle tam puan alinabilir. Sure daha ayirt edici olabilir ama cihaz farklari nedeniyle mutlak adalet saglamaz.
+- Ogrencilere acik skor tablosu varsayilan olarak KAPALI, acildiginda isim yerine anonim sabit takma kimlik gorunur. Yonetici eslesen tam isimleri gorur.
+- Yalnizca surum yuklendikten sonraki tamamlanan oyunlar kaydedilir.
+- Redis sonuc listesi son 2000 kayitla sinirlidir.
+- Toplam ilk 5/10 siralama puana ve esit puanda sureye gore yapilir.
+- Sadece oyun TAMAMLAMA olaylari saklanir; yarida birakilan oyunlar puan olarak kaydedilmez.
+- Sunucu fonksiyon sayisi degismez; mevcut api/books.mjs kullanilir.

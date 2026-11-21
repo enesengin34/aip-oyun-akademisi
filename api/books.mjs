@@ -547,6 +547,52 @@ async function handler_admin_regrade_numbers_POST(req){
 async function handler_admin_backup_GET(req){try{requireAdmin(req);let books=await getBooks();let payload=await Promise.all(books.map(async b=>({book:b,questions:await getQuestions(b.id)})));return out({created:new Date().toISOString(),version:1,data:payload})}catch(e){return respondError(e)}}
 
 
+
+// V14.3 — Pilot: only the 49 five-question educational games use this flow.
+// Scores are client-reported and are NOT cryptographically verified gameplay.
+const GAME_SESSION_PREFIX='aip:games:v143:session:';
+const GAME_RESULTS='aip:games:v143:results';
+const GAME_BOARD_SETTINGS='aip:games:v143:leaderboard:settings';
+const educationalGame=id=>GAMES.find(g=>g.id===id&&g.group==='Eğitici Oyunlar');
+const gameSessionKey=id=>GAME_SESSION_PREFIX+id;
+async function gameSettings(){const raw=await redis('GET',GAME_BOARD_SETTINGS);try{const d=JSON.parse(raw);return {visible:!!d.visible,limit:d.limit===10?10:5}}catch{return {visible:false,limit:5}}}
+async function handler_game_begin_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ const sub=await requireStudent(req),b=await data(req,400),game=educationalGame(b.gameId);
+ if(!game)return error('Bu oyun henüz performans takibini desteklemiyor.',400);
+ if((await gameDisabled()).includes(game.id))return error('Oyun pasif.',403);
+ const ticket=crypto.randomUUID(),start=NOW();
+ await redis('SET',gameSessionKey(ticket),JSON.stringify({sub,gameId:game.id,start}),'EX',3600);
+ return out({ticket,startedAt:start});
+}catch(e){return respondError(e)}}
+async function handler_game_complete_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ const sub=await requireStudent(req),b=await data(req,600),ticket=str(b.ticket),game=educationalGame(b.gameId);
+ if(!/^[a-f0-9-]{36}$/.test(ticket)||!game)return error('Oyun oturumu geçersiz.',400);
+ const raw=await redis('GETDEL',gameSessionKey(ticket));if(!raw)return error('Oyun kaydı daha önce işlendi veya zaman aşımına uğradı.',409);
+ const session=JSON.parse(raw),elapsed=NOW()-session.start,score=Number(b.score);
+ if(session.sub!==sub||session.gameId!==game.id||elapsed<5||elapsed>3600||!Number.isInteger(score)||score<0||score>100||score%20!==0)return error('Sonuç doğrulanamadı.',400);
+ const entry={id:crypto.randomUUID(),studentId:sub,gameId:game.id,score,elapsedSeconds:elapsed,created:new Date().toISOString(),verification:'client-reported'};
+ await redis('LPUSH',GAME_RESULTS,JSON.stringify(entry));await redis('LTRIM',GAME_RESULTS,0,1999);
+ return out({ok:true,score,elapsedSeconds:elapsed});
+}catch(e){return respondError(e)}}
+async function handler_admin_game_performance_GET(req){try{
+ requireAdmin(req);const raw=await redis('LRANGE',GAME_RESULTS,0,1999),results=raw.map(x=>JSON.parse(x));
+ return out({results,studentLabels:await studentLabels(results.map(x=>x.studentId)),games:GAMES.filter(g=>g.group==='Eğitici Oyunlar'),settings:await gameSettings(),limited:true});
+}catch(e){return respondError(e)}}
+async function handler_admin_game_board_settings_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,300);if(typeof b.visible!=='boolean'||![5,10].includes(b.limit))return error('Skor tablosu ayarları geçersiz.',400);
+ await redis('SET',GAME_BOARD_SETTINGS,JSON.stringify({visible:b.visible,limit:b.limit}));return out({ok:true,settings:await gameSettings()});
+}catch(e){return respondError(e)}}
+async function handler_game_board_GET(req){try{
+ const settings=await gameSettings();if(!settings.visible)return out({visible:false,limit:settings.limit,rows:[]});
+ const gameId=new URL(req.url).searchParams.get('gameId')||'',game=educationalGame(gameId);
+ if(!game)return error('Oyun seçiniz.',400);
+ const raw=await redis('LRANGE',GAME_RESULTS,0,1999),best=new Map();
+ for(const item of raw){let r;try{r=JSON.parse(item)}catch{continue}if(r.gameId!==gameId)continue;const old=best.get(r.studentId);if(!old||r.score>old.score||(r.score===old.score&&r.elapsedSeconds<old.elapsedSeconds))best.set(r.studentId,r)}
+ const rows=[...best.values()].sort((a,b)=>b.score-a.score||a.elapsedSeconds-b.elapsedSeconds).slice(0,settings.limit);
+ // Public boards deliberately contain no actual names, student references, or login codes.
+ return out({visible:true,limit:settings.limit,rows:rows.map((r,i)=>({rank:i+1,name:`Oyuncu #${crypto.createHash('sha256').update('public-board:v1|'+r.studentId).digest('hex').slice(0,6).toUpperCase()}`,score:r.score,elapsedSeconds:r.elapsedSeconds}))});
+}catch(e){return respondError(e)}}
+
 const handlers = {
   'login': {'GET': handler_login_GET, 'POST': handler_login_POST},
   'logout': {'POST': handler_logout_POST},
@@ -575,6 +621,11 @@ const handlers = {
   'admin-regrade-numbers': {'POST': handler_admin_regrade_numbers_POST},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
+  'game-begin': {'POST': handler_game_begin_POST},
+  'game-complete': {'POST': handler_game_complete_POST},
+  'game-board': {'GET': handler_game_board_GET},
+  'admin-game-performance': {'GET': handler_admin_game_performance_GET},
+  'admin-game-board-settings': {'POST': handler_admin_game_board_settings_POST},
   'games-status': {'GET': handler_games_status_GET},
   'admin-games': {'GET': handler_admin_games_GET},
   'admin-games-set': {'POST': handler_admin_games_set_POST},
