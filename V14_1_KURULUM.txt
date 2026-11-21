@@ -1,0 +1,31 @@
+AİP OYUN AKADEMİSİ — V14.1 KİTAP SINAVLARI GÜNCELLEMESİ
+Kaynak: Kullanıcının gönderdiği 21 Kasım 2026 tarihli GitHub ZIP içeriği (V14.0).
+
+YÜKLEME
+1. ZIP paketini bilgisayarınızda ayıklayın.
+2. book-exams.js dosyasını GitHub ana dizinine yükleyin (eskisinin üzerine).
+3. api/books.mjs dosyasını GitHub'da api/ klasörüne yükleyin (eskisinin üzerine).
+4. Commit directly to main -> Vercel Ready.
+5. Yönetici panelini yenileyin. Yedek almanız tavsiye edilir.
+
+YENİ ÖZELLİKLER
+• Boşluk doldurmada rakam ile Türkçe yazı karşılıkları eşdeğer kabul edilir (5/Beş, 15/on beş, 100/yüz, 200/iki yüz). Bu karşılaştırma sunucu tarafında yapılır.
+• Sorular tek tek düzenlenebilir; test seçenekleri, doğru şık, kısa cevap alternatifleri değiştirilebilir.
+• Sorulara kolay/orta/zor etiketi verilebilir; henüz zorluk dağılımına göre otomatik seçme ya da raporlama eklenmemiştir.
+• Yönetici, geçmişteki ayrıntılı sınav kaydında bir cevabın doğru/yanlış değerlendirmesini gerekçeyle değiştirebilir. Toplam doğru ve 100 üzerinden puan yeniden hesaplanır; inceleme geçmişi kaydedilir.
+• Daha önce yapılmış sınavların soru ve cevap kayıtları soru bankası düzenlendiğinde değiştirilmez.
+
+SINIRLAR
+• Geçmiş puanlar otomatik yeniden hesaplanmaz. Yönetici cevap ayrıntısındaki butonu kullanarak inceleyebilir.
+• Elle puan düzeltmesi yalnızca soru bazlı ayrıntı kaydı bulunan ve son 2000 kayıt listesinde hâlâ erişilebilir sonuçlara uygulanabilir.
+• Bu güncellemede oyun kodlarıyla giriş, performans izleme ve sıralama panosu YOKTUR. Bunlar oyunların bitiş/puan durumuna göre ayrı V14.2 güncellemesinde ele alınacaktır.
+• Bu sürümde yeni soru türü veya soru silme işlemi YOKTUR. Önce edit/puanlama güvenilirliği sağlandı.
+• Doğru cevap anahtarları yalnızca yönetici API uçlarından alınır.
+
+KONTROL
+1. Soru Düzenleme ve Zorluk Etiketleri alanında kitabı seçip soruları getirin.
+2. Test veya boşluk doldurma sorusunu düzenleyin, kaydedin.
+3. Yeni bir sınavda 'Beş' beklenen soruya '5' girerek sonucu deneyin.
+4. Geçmiş sınavda 'Cevapları gör' alanından yanlış değerlendirmeyi düzeltin, gerekçe girin; paneli yenileyip puanı kontrol edin.
+
+Kod sözdizimi ve 7 yerel test başarılı. Canlı Vercel ve Upstash doğrulaması henüz yapılmadı.

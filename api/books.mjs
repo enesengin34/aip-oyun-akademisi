@@ -48,7 +48,28 @@ function parseBulk(text){let parsed=[],errors=[];str(text).split(/\r?\n/).forEac
   if(type==='BOSLUK'&&p.length===3){q={type:'bosluk',question:p[1],answers:p[2].split('/').map(x=>x.trim()).filter(Boolean)}}
   if(!validateQuestion(q))errors.push(i+1);else parsed.push({...q,id:crypto.randomUUID()})});return {parsed,errors}}
 function normalize(s){return str(s).normalize('NFC').toLocaleLowerCase('tr-TR').trim().replace(/\s+/g,' ').replace(/[.!?,;:]+$/g,'')}
-function grade(attempt,answers){let n=0;const details=attempt.questions.map((q,i)=>{const a=answers[i];let good=q.type==='test'?(a!==null&&a!==undefined&&Number(a)===q.correct):q.answers.some(v=>normalize(v)===normalize(a));if(good)n++;return {type:q.type,correct:good}});return {correct:n,total:attempt.questions.length,score:Math.round(n/attempt.questions.length*100),details}}
+// Turkish number words and digit strings have the same meaning in short answers.
+// Only recognise unambiguous nonnegative integer expressions, not arbitrary words.
+const TR_ONES={sıfır:0,bir:1,iki:2,üç:3,dört:4,beş:5,altı:6,yedi:7,sekiz:8,dokuz:9};
+const TR_TENS={on:10,yirmi:20,otuz:30,kırk:40,elli:50,altmış:60,yetmiş:70,seksen:80,doksan:90};
+function turkishNumber(value){
+ const text=normalize(value);
+ if(/^\d{1,9}$/.test(text))return Number(text);
+ const words=text.split(' ');
+ if(words.length>2)return null;
+ if(words.length===1){if(Object.hasOwn(TR_ONES,words[0]))return TR_ONES[words[0]];if(Object.hasOwn(TR_TENS,words[0]))return TR_TENS[words[0]];if(words[0]==='yüz')return 100;if(words[0]==='bin')return 1000;return null}
+ if(Object.hasOwn(TR_TENS,words[0])&&Object.hasOwn(TR_ONES,words[1])&&TR_ONES[words[1]]>0)return TR_TENS[words[0]]+TR_ONES[words[1]];
+ if(words[0]==='yüz'&&Object.hasOwn(TR_ONES,words[1])&&TR_ONES[words[1]]>0)return 100+TR_ONES[words[1]];
+ if(Object.hasOwn(TR_ONES,words[0])&&TR_ONES[words[0]]>0&&words[1]==='yüz')return TR_ONES[words[0]]*100;
+ return null;
+}
+function equivalentShortAnswer(a,b){
+ if(a===null||a===undefined||normalize(a)==='')return false;
+ if(normalize(a)===normalize(b))return true;
+ const x=turkishNumber(a),y=turkishNumber(b);
+ return x!==null&&y!==null&&x===y;
+}
+function grade(attempt,answers){let n=0;const details=attempt.questions.map((q,i)=>{const a=answers[i];let good=q.type==='test'?(a!==null&&a!==undefined&&Number(a)===q.correct):q.answers.some(v=>equivalentShortAnswer(a,v));if(good)n++;return {type:q.type,correct:good}});return {correct:n,total:attempt.questions.length,score:Math.round(n/attempt.questions.length*100),details}}
 async function authAssertion(assertion){
  const secret=integrationSecret();if(!/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(str(assertion)))throw Object.assign(new Error('Geçersiz doğrulama yanıtı.'),{status:401});
  const [v,p,sig]=assertion.split('.');
@@ -432,6 +453,57 @@ async function handler_admin_skills_set_POST(req){if(!sameOrigin(req))return err
  return out({ok:true,updated:b.changes.length,total:bank.length});
 }catch(e){return respondError(e)}}
 
+// V14.1: Edit a single question without replacing the question bank.
+// Earlier exam snapshots remain immutable. The same ID keeps reviewed skill tags.
+async function handler_admin_question_edit_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,4500);
+ if(!safeId(b.bookId)||typeof b.questionId!=='string')return error('Kitap veya soru kimliği geçersiz.',400);
+ const book=await getBook(b.bookId);if(!book)return error('Kitap bulunamadı.',404);
+ const bank=await getQuestions(b.bookId),index=bank.findIndex(q=>q.id===b.questionId);
+ if(index<0)return error('Soru bulunamadı.',404);
+ const old=bank[index];const q={...old,question:str(b.question||'').trim()};
+ if(old.type==='test'){
+  q.options=Array.isArray(b.options)?b.options.map(x=>str(x).trim()):[];
+  q.correct=Number(b.correct);
+ }else q.answers=Array.isArray(b.answers)?b.answers.map(x=>str(x).trim()).filter(Boolean):[];
+ if(!validateQuestion(q))return error('Soru biçimi veya cevap seçenekleri geçersiz.',400);
+ if(b.difficulty!==undefined){if(!['easy','medium','hard','unset'].includes(b.difficulty))return error('Zorluk etiketi geçersiz.',400);if(b.difficulty==='unset')delete q.difficulty;else q.difficulty=b.difficulty}
+ bank[index]=q;await redis('SET',keys.questions(b.bookId),JSON.stringify(bank));
+ return out({ok:true,questionId:q.id});
+}catch(e){return respondError(e)}}
+// Read-only admin question editor: never send answer keys to student endpoints.
+async function handler_admin_question_bank_GET(req){try{
+ requireAdmin(req);const bookId=new URL(req.url).searchParams.get('bookId')||'';
+ if(!safeId(bookId)||!await getBook(bookId))return error('Kitap bulunamadı.',404);
+ return out({questions:await getQuestions(bookId)});
+}catch(e){return respondError(e)}}
+
+// V14.1: audited manual review of a single answer. This is restricted to the admin.
+// The response retains the original student answer; only the marking decision changes.
+async function handler_admin_answer_review_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ requireAdmin(req);const b=await data(req,1800);
+ if(!/^[a-f0-9-]{36}$/.test(str(b.resultId))||!Number.isInteger(b.index)||b.index<0||b.index>29||typeof b.correct!=='boolean'||typeof b.reason!=='string'||b.reason.trim().length<5||b.reason.length>250)return error('İnceleme bilgileri eksik.',400);
+ const raw=await redis('GET',keys.resultDetail(b.resultId));if(!raw)return error('Sınav ayrıntısı bulunamadı.',404);
+ const detail=JSON.parse(raw);if(!Array.isArray(detail.questions)||!detail.questions[b.index]||detail.result?.id!==b.resultId)return error('Soru bulunamadı.',404);
+ const list=await redis('LRANGE',keys.resultList,0,1999);
+ const pos=list.findIndex(x=>{try{return JSON.parse(x).id===b.resultId}catch{return false}});
+ if(pos<0)return error('Sonuç listede bulunamadı; elle düzeltilmedi.',409);
+ const q=detail.questions[b.index];const previous=q.correct===true;
+ if(previous===b.correct)return error('Seçilen cevap zaten bu şekilde değerlendirilmiş.',409);
+ const oldCorrect=detail.result.correct,oldScore=detail.result.score;
+ const nextCorrect=detail.questions.reduce((n,item,i)=>n+((i===b.index?b.correct:item.correct)===true?1:0),0);
+ const nextScore=Math.round(nextCorrect/detail.questions.length*100);
+ const edit={at:new Date().toISOString(),questionIndex:b.index,questionId:q.questionId,oldCorrect:previous,newCorrect:b.correct,oldScore,newScore:nextScore,reason:b.reason.trim()};
+ q.correct=b.correct;detail.result.correct=nextCorrect;detail.result.score=nextScore;
+ detail.reviews=[...(detail.reviews||[]),edit].slice(-100);
+ // Save the full details first so the audit trail is never lost if result list update fails.
+ await redis('SET',keys.resultDetail(b.resultId),JSON.stringify(detail));
+ await redis('LSET',keys.resultList,pos,JSON.stringify(detail.result));
+ const latest=await redis('GET',keys.studentResult(detail.result.studentId,detail.result.bookId));
+ if(latest){try{if(JSON.parse(latest).id===b.resultId)await redis('SET',keys.studentResult(detail.result.studentId,detail.result.bookId),JSON.stringify(detail.result))}catch{}}
+ return out({ok:true,result:detail.result,review:edit});
+}catch(e){return respondError(e)}}
+
 // admin-backup
 async function handler_admin_backup_GET(req){try{requireAdmin(req);let books=await getBooks();let payload=await Promise.all(books.map(async b=>({book:b,questions:await getQuestions(b.id)})));return out({created:new Date().toISOString(),version:1,data:payload})}catch(e){return respondError(e)}}
 
@@ -458,6 +530,9 @@ const handlers = {
   'admin-skills': {'GET': handler_admin_skills_GET},
   'admin-skills-set': {'POST': handler_admin_skills_set_POST},
   'admin-backup': {'GET': handler_admin_backup_GET},
+  'admin-question-bank': {'GET': handler_admin_question_bank_GET},
+  'admin-question-edit': {'POST': handler_admin_question_edit_POST},
+  'admin-answer-review': {'POST': handler_admin_answer_review_POST},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
   'games-status': {'GET': handler_games_status_GET},
