@@ -593,6 +593,50 @@ async function handler_game_board_GET(req){try{
  return out({visible:true,limit:settings.limit,rows:rows.map((r,i)=>({rank:i+1,name:`Oyuncu #${crypto.createHash('sha256').update('public-board:v1|'+r.studentId).digest('hex').slice(0,6).toUpperCase()}`,score:r.score,elapsedSeconds:r.elapsedSeconds}))});
 }catch(e){return respondError(e)}}
 
+// V14.4 — Initial Akıl-Zekâ tracking: OXO, Reversi and Sudoku only.
+// Results are reported by the browser; NOT suitable for official competition rankings.
+const BRAIN_TYPES={oxo:'OXO',reversi:'Reversi',sudoku:'Sudoku'};
+const BRAIN_LEVELS=['easy','normal','hard'];
+const BRAIN_DIFFICULTY=['kolay','normal','zor'];
+const brainRunKey=t=>`aip:brain:v144:run:${t}`;
+const BRAIN_RESULTS='aip:brain:v144:results';
+const BRAIN_PUBLIC='aip:brain:v144:public';
+function brainValid(gameId,level,shape){return Object.hasOwn(BRAIN_TYPES,gameId)&&(gameId==='sudoku'?BRAIN_DIFFICULTY.includes(level)&&[4,6,9].includes(Number(shape)):BRAIN_LEVELS.includes(level)&&!shape)}
+async function brainSettings(){try{const d=JSON.parse(await redis('GET',BRAIN_PUBLIC));return {visible:!!d.visible,limit:d.limit===10?10:5}}catch{return {visible:false,limit:5}}}
+async function handler_brain_begin_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ const sub=await requireStudent(req),b=await data(req,300),gameId=str(b.gameId),level=str(b.level),shape=Number(b.shape||0);
+ if(!brainValid(gameId,level,shape))return error('Bu oyun veya seviye henüz desteklenmiyor.',400);
+ if((await gameDisabled()).includes('brain:'+gameId))return error('Oyun pasif.',403);
+ if(!await throttle(`brain-start:${sub}`,90,3600))return error('Çok fazla oyun başlatıldı.',429);
+ const ticket=crypto.randomUUID(),started=NOW();
+ await redis('SET',brainRunKey(ticket),JSON.stringify({sub,gameId,level,shape,started}),'EX',7200);
+ return out({ticket,startedAt:started});
+}catch(e){return respondError(e)}}
+async function handler_brain_complete_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{
+ const sub=await requireStudent(req),b=await data(req,400),ticket=str(b.ticket);
+ if(!/^[a-f0-9-]{36}$/.test(ticket))return error('Oyun bileti geçersiz.',400);
+ const raw=await redis('GETDEL',brainRunKey(ticket));if(!raw)return error('Bu oyun daha önce kaydedilmiş veya zaman aşımına uğramış.',409);
+ const run=JSON.parse(raw),seconds=NOW()-run.started;
+ if(run.sub!==sub||run.gameId!==str(b.gameId)||run.level!==str(b.level)||seconds<2||seconds>7200)return error('Oyun sonucu doğrulanamadı.',400);
+ if(run.gameId==='sudoku'&&(!Number.isInteger(b.elapsed)||b.elapsed<1||b.elapsed>seconds+4||run.shape!==Number(b.shape)))return error('Sudoku süresi doğrulanamadı.',400);
+ if(run.gameId!=='sudoku'&&!['win','loss','draw'].includes(b.outcome))return error('Oyun sonucu geçersiz.',400);
+ const result={id:crypto.randomUUID(),studentId:sub,gameId:run.gameId,level:run.level,shape:run.shape||null,outcome:run.gameId==='sudoku'?'complete':b.outcome,seconds:run.gameId==='sudoku'?seconds:null,created:new Date().toISOString(),verification:'client-reported'};
+ await redis('LPUSH',BRAIN_RESULTS,JSON.stringify(result));await redis('LTRIM',BRAIN_RESULTS,0,4999);
+ return out({ok:true,seconds:result.seconds,reported:true});
+}catch(e){return respondError(e)}}
+async function brainAll(){return (await redis('LRANGE',BRAIN_RESULTS,0,4999)).flatMap(x=>{try{return [JSON.parse(x)]}catch{return []}})}
+async function handler_brain_board_GET(req){try{
+ const u=new URL(req.url),gameId=u.searchParams.get('gameId')||'',level=u.searchParams.get('level')||'',shape=Number(u.searchParams.get('shape')||0);
+ if(!brainValid(gameId,level,shape))return error('Oyun seçimi geçersiz.',400);
+ const settings=await brainSettings();if(!settings.visible)return out({visible:false,limit:settings.limit,rows:[]});
+ const results=(await brainAll()).filter(r=>r.gameId===gameId&&r.level===level&&(gameId!=='sudoku'||r.shape===shape));
+ const best=new Map();for(const r of results){let p=best.get(r.studentId);if(!p){p={...r,wins:0,losses:0,draws:0,seconds:null};best.set(r.studentId,p)}if(gameId==='sudoku'){if(p.seconds===null||r.seconds<p.seconds)p.seconds=r.seconds}else if(r.outcome==='win')p.wins++;else if(r.outcome==='loss')p.losses++;else if(r.outcome==='draw')p.draws++}
+ const rows=[...best.values()].sort((a,b)=>gameId==='sudoku'?a.seconds-b.seconds:b.wins-a.wins||b.draws-a.draws||a.losses-b.losses).slice(0,settings.limit);
+ return out({visible:true,limit:settings.limit,rows:rows.map((r,i)=>({rank:i+1,name:`Oyuncu #${crypto.createHash('sha256').update('public-brain:v1|'+r.studentId).digest('hex').slice(0,6).toUpperCase()}`,seconds:r.seconds,wins:r.wins,losses:r.losses,draws:r.draws}))});
+}catch(e){return respondError(e)}}
+async function handler_admin_brain_performance_GET(req){try{requireAdmin(req);const results=await brainAll();return out({results,studentLabels:await studentLabels(results.map(r=>r.studentId)),settings:await brainSettings(),games:BRAIN_TYPES,limited:true})}catch(e){return respondError(e)}}
+async function handler_admin_brain_settings_POST(req){if(!sameOrigin(req))return error('İstek kaynağı geçersiz.',403);try{requireAdmin(req);const b=await data(req,300);if(typeof b.visible!=='boolean'||![5,10].includes(b.limit))return error('Sıralama ayarları geçersiz.',400);await redis('SET',BRAIN_PUBLIC,JSON.stringify({visible:b.visible,limit:b.limit}));return out({ok:true})}catch(e){return respondError(e)}}
+
 const handlers = {
   'login': {'GET': handler_login_GET, 'POST': handler_login_POST},
   'logout': {'POST': handler_logout_POST},
@@ -621,6 +665,11 @@ const handlers = {
   'admin-regrade-numbers': {'POST': handler_admin_regrade_numbers_POST},
   'admin-retake': {'POST': handler_admin_retake_POST},
   'usage': {'POST': handler_usage_POST},
+  'brain-begin': {'POST': handler_brain_begin_POST},
+  'brain-complete': {'POST': handler_brain_complete_POST},
+  'brain-board': {'GET': handler_brain_board_GET},
+  'admin-brain-performance': {'GET': handler_admin_brain_performance_GET},
+  'admin-brain-settings': {'POST': handler_admin_brain_settings_POST},
   'game-begin': {'POST': handler_game_begin_POST},
   'game-complete': {'POST': handler_game_complete_POST},
   'game-board': {'GET': handler_game_board_GET},

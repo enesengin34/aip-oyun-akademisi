@@ -1,0 +1,37 @@
+AİP OYUN AKADEMİSİ — V14.4 İLK AŞAMA
+
+ÖN KOŞUL: Canlı sitede V14.3 çalışıyor olmalıdır.
+
+BU PAKETTE GERÇEKTEN EKLENENLER
+- OXO: Bilgisayara karşı Kolay / Orta / Zor + aynı cihazda iki kişi
+- Reversi: Bilgisayara karşı Kolay / Orta / Zor + aynı cihazda iki kişi
+- Sudoku: 4x4 / 6x6 / 9x9 ve Kolay / Orta / Zor seçimine göre en hızlı tamamlanma kayıtları
+- Sudan/Sudoku ipucu kullanılmış çözüm kayıtları süre listesine eklenmez.
+- Kitap Arkadaşım oturumuyla kayıt; yönetici panelinde önceden eşleştirilmiş isimler.
+- Yönetici panelinden Akıl-Zekâ listesini öğrencilere açıp kapatma, ilk 5/10 seçimi.
+- Bilgisayar galibiyeti, mağlubiyeti, beraberliği seçili seviyeye göre sayılır.
+- İki kişilik oyunlar tek öğrencinin bilgisayara karşı istatistiğine eklenmez.
+
+HENÜZ EKLENMEYENLER
+- Satranç, Dama, Dokuz Taş, Koridor, Mangala, Pentago, Hedef 5 için bilgisayar rakibi
+- Tangram ve Desen Küpleri için iki kişi sırayla süre yarışı ve bilgisayara karşı çözüm stratejisi
+- Bu oyunların sonuçlarının merkezi performans tablosuna kaydı
+NOT: Bu eski oyunların mevcut iki kişilik ya da tek kişilik çalışmaları değiştirilmez.
+
+KURULUM
+1. ZIP'i ayıklayın.
+2. GitHub repo main dizinine: brain-games.js, puzzle-games.js, brain-scores.js,
+   book-exams.js, index.html dosyalarını yükleyin.
+3. api/books.mjs dosyasını GitHub api klasörüne yükleyin.
+4. Commit: V14.4 - Akil zeka ilk asama ve Sudoku siralama
+5. Vercel Ready olunca önce OXO / Reversi, sonra Sudoku, sonra yönetici panelini deneyin.
+
+ÖNEMLİ
+- Sonuçlar oyun tarayıcısından bildiriliyor; sunucu öğrenci oturumunu ve tek kullanımlık
+  oyun biletini kontrol etse bile hamleleri/çözümü bağımsız doğrulamıyor.
+- Öğrencilere açık tabloda gerçek öğrenci isimleri değil anonim oyuncu numaraları kullanılır.
+- Gerçek isimleri yalnızca yönetici görür. Öğrenci giriş kodu ayrıca saklanmaz.
+- V14.3 eğitici oyun performansları korunur. Yeni sonuçlar yayımlandıktan sonra birikir.
+- Bilgisayar zorlukları pratik farklı hamle seçimleri kullanır; resmî seviye derecelendirmesi değildir.
+- Kod sözdizimi ve tarayıcıda OXO/Reversi/Sudoku başlangıç testleri yapıldı.
+  Gerçek Redis bağlantısı ve canlı Vercel dağıtımı bu ortamda test edilmedi.

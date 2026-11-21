@@ -6,7 +6,7 @@ const PuzzleGames=(()=>{
   const rand=n=>Math.floor(Math.random()*n);
   const shuffle=a=>{let b=[...a];for(let i=b.length-1;i>0;i--){let j=rand(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
   function layout(title,intro,html,more=''){
-    el().innerHTML=`<div class="brain-toolbar"><button class="secondary" id="puz-back">← Akıl-Zekâ</button><button class="secondary" id="puz-reset">↻ Yeni Oyun</button></div><section class="brain-panel puz-panel"><h1>${types[type][0]} ${title}</h1><p>${intro}</p><div class="puz-status" id="puz-status" role="status" aria-live="polite"></div>${more}${html}</section>`;
+    el().innerHTML=`<div class="brain-toolbar"><button class="secondary" id="puz-back">← Akıl-Zekâ</button><button class="secondary" id="puz-reset">↻ Yeni Oyun</button></div><section class="brain-panel puz-panel"><h1>${types[type][0]} ${title}</h1><p>${intro}</p><div class="puz-status" id="puz-status" role="status" aria-live="polite"></div>${more}${html}${type==='sudoku'?'<div id="aip-sudoku-board" class="puz-note"></div>':''}</section>`;
     document.getElementById('puz-back').onclick=()=>Brain.list();
     document.getElementById('puz-reset').onclick=()=>type==='sudoku'?initSudoku(state.n,state.difficulty):open(type);
   }
@@ -32,22 +32,22 @@ const PuzzleGames=(()=>{
     document.getElementById('sudoku-start-form').onsubmit=e=>{e.preventDefault();const a=e.currentTarget.elements;sudokuHintsEnabled=a.hints.checked;initSudoku(+a.n.value,a.difficulty.value)};
   }
   function initSudoku(n=4,difficulty='normal'){
-    clearPuzzleTimer();const answer=sudokuSolution(n),board=answer.map(row=>row.slice());
+    clearPuzzleTimer();if(typeof AIPBrainScores!=='undefined')AIPBrainScores.beginSudoku(n,difficulty);const answer=sudokuSolution(n),board=answer.map(row=>row.slice());
     const ratio={kolay:.62,normal:.48,zor:.36}[difficulty]||.48;
     const target=Math.max(n===4?5:n===6?13:24,Math.round(n*n*ratio));
     let slots=shuffle(Array.from({length:n*n},(_,i)=>i));
     for(const i of slots){if(board.flat().filter(Boolean).length<=target)break;let r=Math.floor(i/n),c=i%n,bak=board[r][c];board[r][c]=0;if(countSolutions(board)>1)board[r][c]=bak;}
-    state={n,answer,givens:board.map(row=>row.map(Boolean)),b:board,sel:null,difficulty,elapsed:0,completed:false};drawSudoku();beginPuzzleTimer();
+    state={n,answer,givens:board.map(row=>row.map(Boolean)),b:board,sel:null,difficulty,elapsed:0,completed:false,hintsUsed:false};drawSudoku();beginPuzzleTimer();
   }
   function drawSudoku(){let s=state,n=s.n,bh=n===6?2:n===9?3:2,bw=n/bh;
     let board=s.b.map((row,r)=>row.map((v,c)=>{const thickLeft=c%bw===0?'border-left:3px solid #111827;':'';const thickTop=r%bh===0?'border-top:3px solid #111827;':'';return `<button class="puz-sudoku-cell ${s.givens[r][c]?'given':''} ${s.sel?.[0]===r&&s.sel?.[1]===c?'sel':''}" style="${thickLeft}${thickTop}" data-r="${r}" data-c="${c}" ${s.givens[r][c]||s.completed?'disabled':''}>${v||''}</button>`}).join('')).join('');
     layout('Sudoku','Her satır, sütun ve kutuda her sayı bir kez bulunmalı. Her bulmacanın tek çözümü vardır.',`<div class="puz-meta">⏱️ Süre: <strong id="puz-clock">${timerText(s.elapsed)}</strong> · Zorluk: <strong>${{kolay:'Kolay',normal:'Orta',zor:'Zor'}[s.difficulty]}</strong></div><div class="puz-sudoku-wrap"><div class="puz-sudoku" style="--puz-size:${n}">${board}</div></div><div class="puz-numberbar">${Array.from({length:n},(_,i)=>`<button class="puz-pill" data-num="${i+1}">${i+1}</button>`).join('')}<button class="puz-pill" data-num="0">Sil</button></div><div class="puz-buttons"><button class="secondary" id="puz-check">Kontrol Et</button>${sudokuHintsEnabled?'<button class="secondary" id="puz-hint">İpucu</button>':'<span class="puz-pill">🔒 İpuçları kapalı</span>'}</div><div class="puz-option-row"><label>Tahta <select id="sudoku-size">${[4,6,9].map(x=>`<option value="${x}" ${x===n?'selected':''}>${x}×${x}</option>`).join('')}</select></label><label>Zorluk <select id="sudoku-difficulty">${['kolay','normal','zor'].map(x=>`<option value="${x}" ${x===s.difficulty?'selected':''}>${{kolay:'Kolay',normal:'Orta',zor:'Zor'}[x]}</option>`).join('')}</select></label><button class="secondary" id="sudoku-new">Yeni bulmaca</button><button class="secondary" id="sudoku-settings">Oyun ayarları</button></div>`);
     document.querySelectorAll('.puz-sudoku-cell:not(:disabled)').forEach(b=>b.onclick=()=>{s.sel=[+b.dataset.r,+b.dataset.c];drawSudoku()});
     document.querySelectorAll('[data-num]').forEach(b=>b.onclick=()=>{if(!s.sel||s.completed)return;let[r,c]=s.sel;s.b[r][c]=+b.dataset.num;drawSudoku();if(s.b.flat().every(Boolean))checkSudoku()});
-    document.getElementById('puz-check').onclick=checkSudoku;if(sudokuHintsEnabled)document.getElementById('puz-hint').onclick=()=>{if(s.completed)return;let empty=[];for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(s.b[r][c]!==s.answer[r][c]&&!s.givens[r][c])empty.push([r,c]);if(empty.length){let[r,c]=empty[rand(empty.length)];s.b[r][c]=s.answer[r][c];s.givens[r][c]=true;drawSudoku();status('💡 Bir kare için ipucu verildi.')}};
+    if(typeof AIPBrainScores!=='undefined')AIPBrainScores.showSudokuBoard(n,s.difficulty);document.getElementById('puz-check').onclick=checkSudoku;if(sudokuHintsEnabled)document.getElementById('puz-hint').onclick=()=>{if(s.completed)return;let empty=[];for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(s.b[r][c]!==s.answer[r][c]&&!s.givens[r][c])empty.push([r,c]);if(empty.length){let[r,c]=empty[rand(empty.length)];s.b[r][c]=s.answer[r][c];s.givens[r][c]=true;s.hintsUsed=true;drawSudoku();status('💡 Bir kare için ipucu verildi.')}};
     document.getElementById('sudoku-new').onclick=()=>initSudoku(+document.getElementById('sudoku-size').value,document.getElementById('sudoku-difficulty').value);document.getElementById('sudoku-settings').onclick=sudokuSetup;
   }
-  function checkSudoku(){let s=state,wrong=0,filled=0;for(let r=0;r<s.n;r++)for(let c=0;c<s.n;c++){if(s.b[r][c])filled++;if(s.b[r][c]&&s.b[r][c]!==s.answer[r][c])wrong++}if(!wrong&&filled===s.n*s.n){s.completed=true;clearPuzzleTimer();}status(wrong?`🔎 ${wrong} kare yanlış; tekrar düşün.`:s.completed?`🎉 Bulmacayı ${timerText(s.elapsed)} sürede tamamladın!`:'✅ Girilen sayılarda hata yok. Devam et.');}
+  function checkSudoku(){let s=state,wrong=0,filled=0;for(let r=0;r<s.n;r++)for(let c=0;c<s.n;c++){if(s.b[r][c])filled++;if(s.b[r][c]&&s.b[r][c]!==s.answer[r][c])wrong++}if(!wrong&&filled===s.n*s.n){s.completed=true;clearPuzzleTimer();if(typeof AIPBrainScores!=='undefined')AIPBrainScores.finishSudoku(s.n,s.difficulty,s.elapsed,s.hintsUsed);}status(wrong?`🔎 ${wrong} kare yanlış; tekrar düşün.`:s.completed?`🎉 Bulmacayı ${timerText(s.elapsed)} sürede tamamladın!`:'✅ Girilen sayılarda hata yok. Devam et.');}
   // Turkish Mangala: 6 wells + treasury each; one stone remains when selecting 2+; skip opponent treasury.
   function initMangala(){state={board:Array(14).fill(4),turn:0,done:false};state.board[6]=state.board[13]=0;drawMangala();}
   const own=(i,p)=>p===0?(i>=0&&i<=5):(i>=7&&i<=12);
