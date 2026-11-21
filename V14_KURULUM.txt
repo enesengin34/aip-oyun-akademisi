@@ -1,0 +1,40 @@
+AİP OYUN AKADEMİSİ — V14.0 GELİŞMİŞ ÖLÇME-DEĞERLENDİRME
+
+Bu paket V13.9 sürümünü temel alır. Değişen tek site dosyası: book-exams.js
+
+1. ZIP'i ayıklayın.
+2. book-exams.js dosyasını GitHub projesinin ANA DİZİNİNE yükleyin.
+3. api/books.mjs dosyasını DEĞİŞTİRMEYİN.
+4. Commit: V14.0 - Gelismis olcme degerlendirme raporlari
+5. Vercel Deployments -> Ready.
+6. https://www.oyunakademisi.org/#kitap-sinavlari-yonetim
+7. Yönetici girişi -> "Gelişmiş Ölçme ve Değerlendirme — V14".
+8. Öğrenci ve kitap seçin, "Raporu hesapla" düğmesine basın.
+9. CSV dışa aktarın veya "Raporu yazdır / PDF" ile tarayıcı yazdırma menüsünü açın.
+
+KAPSAM
+- Öğrenci bazlı veya genel puan/süre istatistiği.
+- Beş etiketli becerinin doğru/sorulan oranları; beşten az soruda yetersiz veri uyarısı.
+- Kitap bazında ortalama puan karşılaştırması.
+- Öğrencinin eski/yeni sınavlarının zaman çizelgesi.
+- Öğretim etkinliği için beceriye özgü öneriler (en az 5 soruluk ölçümlerde).
+- En az 5 kez sorulmuş soruların betimleyici başarı oranına göre incelenmesi.
+- Excel ile açılabilir CSV ve tarayıcı üzerinden yazdırma/PDF.
+
+KORUNAN ÖZELLİKLER
+- Soru sayısı seçimi (5-30), süreler, tekrar izinleri, öğrenci eşleştirmeleri,
+  oyun yönetimi, anonim istatistikler ve renkli soru cevap dökümü.
+- Mevcut soru havuzları veya Redis verileri değiştirilmez.
+- Yeni Vercel API fonksiyonu ve yeni ortam değişkeni gerekmez.
+- Öğrenciye cevap anahtarı açılmaz; rapor yalnızca yönetici alanındadır.
+
+SINIRLAR
+- Mevcut sunucu API'si son 200 sınav sonucuna bakar. Tüm geçmiş için ileride
+  sunucu tarafında sayfalama/tarih filtreleri gereklidir.
+- V13.6 öncesi sınavlarda soru cevap ayrıntıları geriye getirilemez.
+- Soru güçlüğü için gösterilen oran, örneklemden hesaplanan BETİMLEYİCİ bir ölçüdür.
+  Psikometrik güçlük, ayırt edicilik veya tanı olarak kullanılmamalıdır.
+- Öğrencinin farklı kitaplarda ilk-son puan değişimi, eş güçlükte sınavlarla
+  ölçülmediğinden kesin beceri gelişimi anlamına gelmez.
+- Bu sürüm yeni soru türlerini veya soru zorluk etiketlerini henüz eklemez;
+  daha sonraki güvenli API/soru bankası güncellemesinde ele alınmalıdır.
